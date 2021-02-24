@@ -3,17 +3,20 @@ use std::marker::PhantomData;
 pub type Mono = [f32; 1];
 pub type Stereo = [f32; 2];
 
-pub trait Frame: Default {
+pub trait Frame: Default + Clone {
     fn channels(&self) -> usize;
     fn get_channel(&self, index: usize) -> f32;
     fn map<F>(self, f: F) -> Self
     where
         F: Fn(f32) -> f32;
+    fn join<F>(self, other: Self, f: F) -> Self
+    where
+        F: Fn(f32, f32) -> f32;
 }
 
 impl<T> Frame for T
 where
-    T: Default + AsRef<[f32]> + AsMut<[f32]> + Send + 'static,
+    T: Default + Clone + AsRef<[f32]> + AsMut<[f32]> + Send + 'static,
 {
     fn channels(&self) -> usize {
         self.as_ref().len()
@@ -27,6 +30,15 @@ where
     {
         for a in self.as_mut() {
             *a = f(*a);
+        }
+        self
+    }
+    fn join<F>(mut self, other: Self, f: F) -> Self
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        for (a, b) in self.as_mut().iter_mut().zip(other.as_ref()) {
+            *a = f(*a, *b);
         }
         self
     }

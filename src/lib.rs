@@ -1,4 +1,5 @@
 pub mod gen;
+pub mod mixer;
 pub mod source;
 
 use std::sync::{Arc, Mutex};
@@ -6,13 +7,12 @@ use std::sync::{Arc, Mutex};
 use cpal::traits::*;
 
 pub use cpal;
-pub use source::*;
+pub use mixer::*;
+pub use source::{Frame, Mono, Source, Stereo};
 
 pub fn default_output_device() -> Option<cpal::Device> {
     cpal::default_host().default_output_device()
 }
-
-type MixedSource<F> = (Box<dyn Source<Frame = F> + Send + 'static>, f32);
 
 pub struct DeviceMixer<F> {
     pub device: Option<cpal::Device>,
@@ -48,7 +48,7 @@ where
     where
         S: Source<Frame = F> + Send + 'static,
     {
-        self.sources.lock().unwrap().push((Box::new(source), 0.0));
+        self.sources.lock().unwrap().push(MixedSource::new(source));
     }
     pub fn default_config(&self) -> Option<cpal::SupportedStreamConfig> {
         self.device.as_ref().and_then(|device| {
@@ -101,24 +101,19 @@ where
         A: Amplitude,
     {
         let mut i = 0;
-        let mut curr_frame = None;
         let channels = config.channels as usize;
         let sample_rate = config.sample_rate.0 as f32;
         let sources = Arc::clone(&self.sources);
         move |buffer, _| {
             buffer.fill(A::MIDPOINT);
-            for (source, t) in &mut *sources.lock().unwrap() {
+            for ms in &mut *sources.lock().unwrap() {
                 let mut b = 0;
                 loop {
-                    if curr_frame.is_none() {
-                        if let Some(frame) = source.next() {
-                            *t += 1.0 / source.sample_rate();
-                            curr_frame = Some(frame);
-                        } else {
-                            return;
-                        }
-                    }
-                    let frame = curr_frame.as_ref().unwrap();
+                    let frame = if let Some(frame) = ms.frame() {
+                        frame
+                    } else {
+                        return;
+                    };
                     while i < channels as usize && b < buffer.len() {
                         let c = i % frame.channels();
                         let a = frame.get_channel(c);
@@ -126,11 +121,8 @@ where
                         i += 1;
                         b += 1;
                     }
-                    *t -= 1.0 / sample_rate;
+                    ms.advance(sample_rate);
                     if i == channels as usize {
-                        if *t <= 0.0 {
-                            curr_frame = None;
-                        }
                         i = 0;
                     }
                     if b == buffer.len() {
@@ -174,8 +166,10 @@ impl Amplitude for i16 {
 fn test() {
     use std::{thread::sleep, time::Duration};
     let mut mixer = DeviceMixer::default();
-    mixer.add(gen::SineWave::new(220.0, 32000.0));
-    mixer.add(gen::SquareWave::new(440.0, 32000.0));
+    let (mx, mx_source) = Mixer::new();
+    mixer.add(mx_source);
+    mx.add(gen::SineWave::new(220.0, 32000.0));
+    // mixer.add(gen::SquareWave::new(440.0, 32000.0));
     mixer.play().unwrap();
     sleep(Duration::from_secs(1));
 }
