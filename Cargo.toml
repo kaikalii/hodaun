@@ -1,0 +1,8 @@
+[package]
+authors = ['Kai Schmidt <kai.schmidt@constructioninnovations.com>']
+edition = '2018'
+name = 'hodaun'
+version = '0.1.0'
+
+[dependencies]
+cpal = '0.13.1'
