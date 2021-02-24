@@ -102,13 +102,13 @@ where
         let sources = Arc::clone(&self.sources);
         move |buffer, _| {
             buffer.fill(A::MIDPOINT);
-            for ms in &mut *sources.lock().unwrap() {
+            'sources_loop: for ms in &mut *sources.lock().unwrap() {
                 let mut b = 0;
                 loop {
                     let frame = if let Some(frame) = ms.frame() {
                         frame
                     } else {
-                        return;
+                        continue 'sources_loop;
                     };
                     while i < channels as usize && b < buffer.len() {
                         let c = i % frame.channels();
@@ -122,6 +122,7 @@ where
                         i = 0;
                     }
                     if b == buffer.len() {
+                        i = 0;
                         break;
                     }
                 }
