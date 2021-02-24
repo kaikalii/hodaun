@@ -2,7 +2,12 @@ pub mod gen;
 pub mod mixer;
 pub mod source;
 
-use std::sync::{Arc, Mutex};
+use std::{
+    cmp::Ordering,
+    fmt,
+    hash::{Hash, Hasher},
+    sync::{Arc, Mutex},
+};
 
 use cpal::traits::*;
 
@@ -172,4 +177,93 @@ fn test() {
     // mixer.add(gen::SquareWave::new(440.0, 32000.0));
     mixer.play().unwrap();
     sleep(Duration::from_secs(1));
+}
+
+#[derive(Clone, Default)]
+pub struct Shared<T>(Arc<Mutex<T>>);
+
+impl<T> Shared<T> {
+    pub fn new(val: T) -> Self {
+        Shared(Arc::new(Mutex::new(val)))
+    }
+    pub fn set(&self, val: T) {
+        *self.0.lock().unwrap() = val;
+    }
+}
+
+impl<T> Shared<T>
+where
+    T: Copy,
+{
+    pub fn get(&self) -> T {
+        *self.0.lock().unwrap()
+    }
+}
+
+impl<T> Shared<T>
+where
+    T: Clone,
+{
+    pub fn cloned(&self) -> T {
+        self.0.lock().unwrap().clone()
+    }
+}
+
+impl<T> PartialEq for Shared<T>
+where
+    T: PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        *self.0.lock().unwrap() == *other.0.lock().unwrap()
+    }
+}
+
+impl<T> Eq for Shared<T> where T: Eq {}
+
+impl<T> PartialOrd for Shared<T>
+where
+    T: PartialOrd,
+{
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.0
+            .lock()
+            .unwrap()
+            .partial_cmp(&*other.0.lock().unwrap())
+    }
+}
+
+impl<T> Ord for Shared<T>
+where
+    T: Ord,
+{
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.0.lock().unwrap().cmp(&*other.0.lock().unwrap())
+    }
+}
+
+impl<T> Hash for Shared<T>
+where
+    T: Hash,
+{
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.lock().unwrap().hash(state);
+    }
+}
+
+impl<T> fmt::Debug for Shared<T>
+where
+    T: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.lock().unwrap().fmt(f)
+    }
+}
+
+impl<T> fmt::Display for Shared<T>
+where
+    T: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.lock().unwrap().fmt(f)
+    }
 }
