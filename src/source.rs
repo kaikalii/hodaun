@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use crate::{lerp, Shared};
+
 pub type Mono = [f32; 1];
 pub type Stereo = [f32; 2];
 
@@ -9,7 +11,7 @@ pub trait Frame: Default + Clone {
     fn map<F>(self, f: F) -> Self
     where
         F: Fn(f32) -> f32;
-    fn join<F>(self, other: Self, f: F) -> Self
+    fn merge<F>(&mut self, other: Self, f: F)
     where
         F: Fn(f32, f32) -> f32;
 }
@@ -33,14 +35,13 @@ where
         }
         self
     }
-    fn join<F>(mut self, other: Self, f: F) -> Self
+    fn merge<F>(&mut self, other: Self, f: F)
     where
         F: Fn(f32, f32) -> f32,
     {
         for (a, b) in self.as_mut().iter_mut().zip(other.as_ref()) {
             *a = f(*a, *b);
         }
-        self
     }
 }
 
@@ -53,6 +54,17 @@ pub trait Source {
         Self: Sized,
     {
         Amplify { source: self, amp }
+    }
+    fn low_pass<F>(self, freq: F) -> LowPass<Self>
+    where
+        Self: Sized,
+        F: Into<Shared<f32>>,
+    {
+        LowPass {
+            source: self,
+            freq: freq.into(),
+            acc: None,
+        }
     }
 }
 
@@ -99,5 +111,38 @@ where
     }
     fn next(&mut self) -> Option<Self::Frame> {
         Some(F::default())
+    }
+}
+
+pub struct LowPass<S>
+where
+    S: Source,
+{
+    source: S,
+    acc: Option<S::Frame>,
+    freq: Shared<f32>,
+}
+
+impl<S> Source for LowPass<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        if let Some(frame) = self.source.next() {
+            Some(if let Some(acc) = &mut self.acc {
+                let t = (self.freq.get() / self.source.sample_rate()).min(1.0);
+                acc.merge(frame, |a, b| lerp(a, b, t));
+                acc.clone()
+            } else {
+                self.acc = Some(frame.clone());
+                frame
+            })
+        } else {
+            None
+        }
     }
 }

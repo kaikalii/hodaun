@@ -179,7 +179,11 @@ fn test() {
     sleep(Duration::from_secs(1));
 }
 
-#[derive(Clone, Default)]
+pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+    (1.0 - t) * a + t * b
+}
+
+#[derive(Default)]
 pub struct Shared<T>(Arc<Mutex<T>>);
 
 impl<T> Shared<T> {
@@ -215,6 +219,12 @@ where
 {
     fn eq(&self, other: &Self) -> bool {
         *self.0.lock().unwrap() == *other.0.lock().unwrap()
+    }
+}
+
+impl<T> Clone for Shared<T> {
+    fn clone(&self) -> Self {
+        Shared(Arc::clone(&self.0))
     }
 }
 
@@ -265,5 +275,17 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.0.lock().unwrap().fmt(f)
+    }
+}
+
+impl<'a, T> From<&'a Shared<T>> for Shared<T> {
+    fn from(shared: &'a Shared<T>) -> Self {
+        (*shared).clone()
+    }
+}
+
+impl<T> From<T> for Shared<T> {
+    fn from(val: T) -> Self {
+        Shared::new(val)
     }
 }

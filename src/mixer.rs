@@ -102,7 +102,7 @@ where
         let sample_rate = self.sample_rate();
         for ms in &mut self.sources {
             if let Some(this_frame) = ms.frame() {
-                frame = frame.join(this_frame, |a, b| a + b);
+                frame.merge(this_frame, |a, b| a + b);
             }
             ms.advance(sample_rate);
         }
