@@ -77,12 +77,25 @@ pub trait Source {
             acc: None,
         }
     }
-    fn map<F, B>(self, f: F) -> Map<Self, F>
+    fn map<F>(self, f: F) -> Map<Self, F>
     where
         Self: Sized,
-        F: Fn(Self::Frame) -> B,
     {
         Map { source: self, f }
+    }
+    fn zip<F, B>(self, other: B, f: F) -> Zip<Self, B, F>
+    where
+        Self: Sized,
+        B: Source,
+    {
+        Zip {
+            a: self,
+            curr_a: None,
+            b: other,
+            curr_b: None,
+            f,
+            t: 0.0,
+        }
     }
 }
 
@@ -182,5 +195,50 @@ where
     }
     fn next(&mut self) -> Option<Self::Frame> {
         self.source.next().map(&self.f)
+    }
+}
+
+pub struct Zip<A, B, F>
+where
+    A: Source,
+    B: Source,
+{
+    a: A,
+    curr_a: Option<A::Frame>,
+    b: B,
+    curr_b: Option<B::Frame>,
+    f: F,
+    t: f32,
+}
+
+impl<A, B, F, C> Source for Zip<A, B, F>
+where
+    A: Source,
+    B: Source,
+    F: Fn(A::Frame, B::Frame) -> C,
+    C: Frame,
+{
+    type Frame = C;
+    fn sample_rate(&self) -> f32 {
+        self.a.sample_rate().max(self.b.sample_rate())
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        let a = if self.t >= 0.0 {
+            let frame = self.a.next()?;
+            self.curr_a = Some(frame.clone());
+            self.t -= 1.0 / self.a.sample_rate();
+            frame
+        } else {
+            self.curr_a.clone()?
+        };
+        let b = if self.t < 0.0 {
+            let frame = self.b.next()?;
+            self.curr_b = Some(frame.clone());
+            self.t += 1.0 / self.b.sample_rate();
+            frame
+        } else {
+            self.curr_b.clone()?
+        };
+        Some((self.f)(a, b))
     }
 }
