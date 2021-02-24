@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
 
 use crate::{lerp, Shared};
 
@@ -95,6 +95,15 @@ pub trait Source {
             curr_b: None,
             f,
             t: 0.0,
+        }
+    }
+    fn maintained(self, maintainer: &Maintainer) -> Maintained<Self>
+    where
+        Self: Sized,
+    {
+        Maintained {
+            source: self,
+            arc: Arc::clone(&maintainer.0),
         }
     }
 }
@@ -240,5 +249,36 @@ where
             self.curr_b.clone()?
         };
         Some((self.f)(a, b))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Maintainer(Arc<()>);
+
+impl Maintainer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+pub struct Maintained<S> {
+    source: S,
+    arc: Arc<()>,
+}
+
+impl<S> Source for Maintained<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        if Arc::strong_count(&self.arc) == 1 {
+            None
+        } else {
+            self.source.next()
+        }
     }
 }

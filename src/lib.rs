@@ -1,5 +1,5 @@
 pub mod gen;
-pub mod mixer;
+mod mixer;
 pub mod source;
 
 use std::{
@@ -13,7 +13,8 @@ use cpal::traits::*;
 
 pub use cpal;
 pub use mixer::*;
-pub use source::{mono, stereo, Frame, Mono, Silence, Source, Stereo};
+#[doc(inline)]
+pub use source::{mono, stereo, Frame, Maintainer, Mono, Silence, Source, Stereo};
 
 pub fn default_output_device() -> Option<cpal::Device> {
     cpal::default_host().default_output_device()
