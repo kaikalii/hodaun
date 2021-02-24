@@ -1,7 +1,7 @@
 pub type Mono = [f32; 1];
 pub type Stereo = [f32; 2];
 
-pub trait Frame: Send + 'static {
+pub trait Frame {
     fn channels(&self) -> usize;
     fn get_channel(&self, index: usize) -> f32;
     fn map<F>(self, f: F) -> Self
@@ -30,7 +30,7 @@ where
     }
 }
 
-pub trait Source: Send + 'static {
+pub trait Source {
     type Frame: Frame;
     fn sample_rate(&self) -> f32;
     fn next(&mut self) -> Option<Self::Frame>;

@@ -12,7 +12,7 @@ pub fn default_output_device() -> Option<cpal::Device> {
     cpal::default_host().default_output_device()
 }
 
-type MixedSource<F> = (Box<dyn Source<Frame = F>>, f32);
+type MixedSource<F> = (Box<dyn Source<Frame = F> + Send + 'static>, f32);
 
 pub struct DeviceMixer<F> {
     pub device: Option<cpal::Device>,
@@ -42,11 +42,11 @@ impl<F> Default for DeviceMixer<F> {
 
 impl<F> DeviceMixer<F>
 where
-    F: Frame,
+    F: Frame + Send + 'static,
 {
     pub fn add<S>(&self, source: S)
     where
-        S: Source<Frame = F>,
+        S: Source<Frame = F> + Send + 'static,
     {
         self.sources.lock().unwrap().push((Box::new(source), 0.0));
     }
@@ -174,7 +174,8 @@ impl Amplitude for i16 {
 fn test() {
     use std::{thread::sleep, time::Duration};
     let mut mixer = DeviceMixer::default();
-    mixer.add(gen::Sine::new(220.0, 32000.0));
+    mixer.add(gen::SineWave::new(220.0, 32000.0));
+    mixer.add(gen::SquareWave::new(440.0, 32000.0));
     mixer.play().unwrap();
     sleep(Duration::from_secs(1));
 }
