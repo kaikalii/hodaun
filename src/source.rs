@@ -66,6 +66,13 @@ pub trait Source {
             acc: None,
         }
     }
+    fn map<F, B>(self, f: F) -> Map<Self, F>
+    where
+        Self: Sized,
+        F: Fn(Self::Frame) -> B,
+    {
+        Map { source: self, f }
+    }
 }
 
 pub struct Amplify<S> {
@@ -144,5 +151,25 @@ where
         } else {
             None
         }
+    }
+}
+
+pub struct Map<S, F> {
+    source: S,
+    f: F,
+}
+
+impl<S, F, B> Source for Map<S, F>
+where
+    S: Source,
+    F: Fn(S::Frame) -> B,
+    B: Frame,
+{
+    type Frame = B;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        self.source.next().map(&self.f)
     }
 }
