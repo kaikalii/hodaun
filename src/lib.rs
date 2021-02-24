@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex};
 use cpal::traits::*;
 
 pub use cpal;
-pub use source::{Frame, Mono, Source, Stereo};
+pub use source::*;
 
 pub fn default_output_device() -> Option<cpal::Device> {
     cpal::default_host().default_output_device()
