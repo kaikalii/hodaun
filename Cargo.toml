@@ -6,3 +6,5 @@ version = '0.1.0'
 
 [dependencies]
 cpal = '0.13.1'
+rand.features = ['small_rng']
+rand.version = '0.8.3'

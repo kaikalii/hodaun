@@ -163,7 +163,8 @@ fn test() {
     use std::{thread::sleep, time::Duration};
     let mut mixer = DeviceMixer::with_default_device().unwrap();
     mixer.add(gen::SineWave::new(220.0, 32000.0).zip(
-        gen::SineWave::new(277.18, 44100.0),
+        gen::Noise::new(32000.0),
+        // gen::SineWave::new(277.18, 44100.0),
         // Silence::new(32000.0),
         |[a]: Mono, [b]: Mono| [a, b],
     ));

@@ -1,5 +1,7 @@
 use std::{f32::consts::TAU, marker::PhantomData};
 
+use rand::prelude::*;
+
 use crate::source::*;
 
 pub trait Waveform {
@@ -63,3 +65,28 @@ impl Waveform for Square {
 
 pub type SineWave = Wave<Sine>;
 pub type SquareWave = Wave<Square>;
+
+#[derive(Debug, Clone)]
+pub struct Noise {
+    rng: SmallRng,
+    sample_rate: f32,
+}
+
+impl Noise {
+    pub fn new(sample_rate: f32) -> Self {
+        Noise {
+            rng: SmallRng::from_entropy(),
+            sample_rate,
+        }
+    }
+}
+
+impl Source for Noise {
+    type Frame = Mono;
+    fn sample_rate(&self) -> f32 {
+        self.sample_rate
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        Some([self.rng.gen_range(-1.0..=1.0) as f32])
+    }
+}
