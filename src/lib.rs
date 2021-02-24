@@ -21,7 +21,7 @@ pub fn default_output_device() -> Option<cpal::Device> {
 }
 
 pub struct DeviceMixer<F> {
-    pub device: Option<cpal::Device>,
+    device: cpal::Device,
     sources: Arc<Mutex<Vec<MixedSource<F>>>>,
     stream: Option<cpal::Stream>,
 }
@@ -29,20 +29,13 @@ pub struct DeviceMixer<F> {
 impl<F> DeviceMixer<F> {
     pub fn new(device: cpal::Device) -> Self {
         DeviceMixer {
-            device: Some(device),
+            device,
             sources: Default::default(),
             stream: None,
         }
     }
-}
-
-impl<F> Default for DeviceMixer<F> {
-    fn default() -> Self {
-        DeviceMixer {
-            device: default_output_device(),
-            sources: Default::default(),
-            stream: None,
-        }
+    pub fn with_default_device() -> Option<Self> {
+        default_output_device().map(Self::new)
     }
 }
 
@@ -57,13 +50,11 @@ where
         self.sources.lock().unwrap().push(MixedSource::new(source));
     }
     pub fn default_config(&self) -> Option<cpal::SupportedStreamConfig> {
-        self.device.as_ref().and_then(|device| {
-            device
-                .supported_output_configs()
-                .ok()
-                .and_then(|mut scs| scs.next())
-                .map(|sc| sc.with_max_sample_rate())
-        })
+        self.device
+            .supported_output_configs()
+            .ok()
+            .and_then(|mut scs| scs.next())
+            .map(|sc| sc.with_max_sample_rate())
     }
     pub fn play(&mut self) -> Result<(), cpal::PlayStreamError> {
         if let Some(config) = self.default_config() {
@@ -76,28 +67,27 @@ where
         &mut self,
         config: cpal::SupportedStreamConfig,
     ) -> Result<(), cpal::PlayStreamError> {
-        if let Some(device) = self.device.as_ref() {
-            let sample_format = config.sample_format();
-            let config = cpal::StreamConfig::from(config);
-            let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
-            let stream = match sample_format {
-                cpal::SampleFormat::F32 => {
-                    device.build_output_stream(&config, self.write_sources::<f32>(&config), err_fn)
-                }
-                cpal::SampleFormat::I16 => {
-                    device.build_output_stream(&config, self.write_sources::<i16>(&config), err_fn)
-                }
-                cpal::SampleFormat::U16 => {
-                    device.build_output_stream(&config, self.write_sources::<u16>(&config), err_fn)
-                }
+        let sample_format = config.sample_format();
+        let config = cpal::StreamConfig::from(config);
+        let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
+        let stream = match sample_format {
+            cpal::SampleFormat::F32 => {
+                self.device
+                    .build_output_stream(&config, self.write_sources::<f32>(&config), err_fn)
             }
-            .unwrap();
-            stream.play()?;
-            self.stream = Some(stream);
-            Ok(())
-        } else {
-            Ok(())
+            cpal::SampleFormat::I16 => {
+                self.device
+                    .build_output_stream(&config, self.write_sources::<i16>(&config), err_fn)
+            }
+            cpal::SampleFormat::U16 => {
+                self.device
+                    .build_output_stream(&config, self.write_sources::<u16>(&config), err_fn)
+            }
         }
+        .unwrap();
+        stream.play()?;
+        self.stream = Some(stream);
+        Ok(())
     }
     fn write_sources<A>(
         &self,
@@ -171,7 +161,7 @@ impl Amplitude for i16 {
 #[test]
 fn test() {
     use std::{thread::sleep, time::Duration};
-    let mut mixer = DeviceMixer::default();
+    let mut mixer = DeviceMixer::with_default_device().unwrap();
     mixer.add(gen::SineWave::new(220.0, 32000.0).zip(
         gen::SineWave::new(277.18, 44100.0),
         // Silence::new(32000.0),
