@@ -13,7 +13,7 @@ use cpal::traits::*;
 
 pub use cpal;
 pub use mixer::*;
-pub use source::{Frame, Mono, Source, Stereo};
+pub use source::{mono, stereo, Frame, Mono, Source, Stereo};
 
 pub fn default_output_device() -> Option<cpal::Device> {
     cpal::default_host().default_output_device()
@@ -173,7 +173,7 @@ fn test() {
     let mut mixer = DeviceMixer::default();
     let (mx, mx_source) = Mixer::new();
     mixer.add(mx_source);
-    mx.add(gen::SineWave::new(220.0, 32000.0));
+    mx.add(gen::SineWave::new(220.0, 32000.0).map(stereo));
     // mixer.add(gen::SquareWave::new(440.0, 32000.0));
     mixer.play().unwrap();
     sleep(Duration::from_secs(1));

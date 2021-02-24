@@ -5,6 +5,17 @@ use crate::{lerp, Shared};
 pub type Mono = [f32; 1];
 pub type Stereo = [f32; 2];
 
+pub fn mono<F>(frame: F) -> Mono
+where
+    F: AsRef<[f32]>,
+{
+    [frame.as_ref().iter().sum::<f32>() / frame.as_ref().len() as f32]
+}
+
+pub fn stereo(frame: Mono) -> Stereo {
+    [frame[0]; 2]
+}
+
 pub trait Frame: Default + Clone {
     fn channels(&self) -> usize;
     fn get_channel(&self, index: usize) -> f32;
