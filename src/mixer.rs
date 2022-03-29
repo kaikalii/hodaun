@@ -1,4 +1,4 @@
-use std::sync::mpsc::*;
+use crossbeam_channel::{unbounded, Receiver, Sender};
 
 use crate::source::*;
 
@@ -73,7 +73,7 @@ impl<F> Mixer<F> {
 impl<F> Mixer<F> {
     /// Create a new mixer interface and corresponing [`Source`]
     pub fn new() -> (Mixer<F>, MixerSource<F>) {
-        let (send, recv) = channel();
+        let (send, recv) = unbounded();
         (
             Mixer { send },
             MixerSource {
