@@ -70,7 +70,7 @@ where
             .and_then(|mut scs| scs.next())
             .map(|sc| sc.with_max_sample_rate())
     }
-    /// Start the mixer playing
+    /// Start the mixer playing without blocking the thread
     ///
     /// Playback will stop if the mixer is dropped
     pub fn play(&mut self) -> Result<(), cpal::PlayStreamError> {
@@ -79,6 +79,28 @@ where
         } else {
             Ok(())
         }
+    }
+    /// Play the mixer, blocking the thread until all sources have finished
+    pub fn blocking_play(self) -> Result<(), cpal::PlayStreamError> {
+        if let Some(config) = self.default_config() {
+            self.blocking_play_with_config(config)?;
+        }
+        Ok(())
+    }
+    /// Play the mixer with the given config, blocking the thread until all sources have finished
+    pub fn blocking_play_with_config(
+        mut self,
+        config: cpal::SupportedStreamConfig,
+    ) -> Result<(), cpal::PlayStreamError> {
+        self.play_with_config(config)?;
+        while self
+            .sources
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|source| !source.finished())
+        {}
+        Ok(())
     }
     /// Start the mixer playing with the given config
     ///

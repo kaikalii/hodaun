@@ -210,7 +210,7 @@ where
             return None;
         }
         let frame = self.source.next()?;
-        self.duration += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+        self.elapsed += Duration::from_secs_f32(1.0 / self.source.sample_rate());
         Some(frame)
     }
 }
