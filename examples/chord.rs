@@ -8,7 +8,7 @@ use hodaun::{
 const SAMPLE_RATE: f32 = 44100.0;
 
 fn main() {
-    let output = DeviceMixer::<Mono>::with_default_device().unwrap();
+    let mut output = DeviceMixer::<Mono>::with_default_device().unwrap();
     let (mixer, mixer_source) = Mixer::new();
 
     mixer.add(Wave::<Sine>::new(220.0, SAMPLE_RATE).amplify(0.5));
