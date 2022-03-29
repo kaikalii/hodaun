@@ -1,14 +1,6 @@
 //! Audio sources
 
-use std::{
-    collections::VecDeque,
-    marker::PhantomData,
-    sync::{
-        mpsc::{channel, Receiver, Sender},
-        Arc,
-    },
-    time::Duration,
-};
+use std::{collections::VecDeque, marker::PhantomData, sync::Arc, time::Duration};
 
 use crate::{lerp, Shared};
 
@@ -167,10 +159,10 @@ pub trait Source {
     where
         Self: Sized,
     {
-        let (send, recv) = channel();
+        let curr = Shared::new(None);
         (
-            SourceInspector { curr: None, recv },
-            InspectedSource { source: self, send },
+            SourceInspector { curr: curr.clone() },
+            InspectedSource { source: self, curr },
         )
     }
 }
@@ -426,13 +418,12 @@ where
 /// A source that is being inspected by a [`SourceInspector`]
 pub struct InspectedSource<S: Source> {
     source: S,
-    send: Sender<Option<S::Frame>>,
+    curr: Shared<Option<S::Frame>>,
 }
 
 /// Allows the inspection of a [`Source`]'s current frame
 pub struct SourceInspector<F> {
-    curr: Option<F>,
-    recv: Receiver<Option<F>>,
+    curr: Shared<Option<F>>,
 }
 
 impl<S: Source> Source for InspectedSource<S> {
@@ -442,7 +433,7 @@ impl<S: Source> Source for InspectedSource<S> {
     }
     fn next(&mut self) -> Option<Self::Frame> {
         let frame = self.source.next();
-        let _ = self.send.send(frame.clone());
+        self.curr.set(frame.clone());
         frame
     }
 }
@@ -453,9 +444,6 @@ where
 {
     /// Read the inspected [`Source`]'s current frame
     pub fn read(&mut self) -> Option<F> {
-        for frame in self.recv.try_iter() {
-            self.curr = frame;
-        }
-        self.curr.clone()
+        self.curr.cloned()
     }
 }
