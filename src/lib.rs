@@ -1,3 +1,9 @@
+#![warn(missing_docs)]
+
+/*!
+A crate to simplify audio output
+*/
+
 pub mod gen;
 mod mixer;
 pub mod source;
@@ -16,10 +22,12 @@ pub use mixer::*;
 #[doc(inline)]
 pub use source::{mono, stereo, Frame, Maintainer, Mono, Silence, Source, Stereo};
 
+/// Get the default output device
 pub fn default_output_device() -> Option<cpal::Device> {
     cpal::default_host().default_output_device()
 }
 
+/// Mixes audio sources and outputs them to a device
 pub struct DeviceMixer<F> {
     device: cpal::Device,
     sources: Arc<Mutex<Vec<MixedSource<F>>>>,
@@ -27,6 +35,7 @@ pub struct DeviceMixer<F> {
 }
 
 impl<F> DeviceMixer<F> {
+    /// Create a new [`DeviceMixer`] that will output on the given device
     pub fn new(device: cpal::Device) -> Self {
         DeviceMixer {
             device,
@@ -34,6 +43,7 @@ impl<F> DeviceMixer<F> {
             stream: None,
         }
     }
+    /// Create a new [`DeviceMixer`] that will output on the default output device
     pub fn with_default_device() -> Option<Self> {
         default_output_device().map(Self::new)
     }
@@ -43,12 +53,16 @@ impl<F> DeviceMixer<F>
 where
     F: Frame + Send + 'static,
 {
+    /// Add a [`Source`] to the mixer
+    ///
+    /// Sources that stop yielding frames are removed and dropped
     pub fn add<S>(&self, source: S)
     where
         S: Source<Frame = F> + Send + 'static,
     {
         self.sources.lock().unwrap().push(MixedSource::new(source));
     }
+    /// Get the default supported stream config from the mixer
     pub fn default_config(&self) -> Option<cpal::SupportedStreamConfig> {
         self.device
             .supported_output_configs()
@@ -56,6 +70,9 @@ where
             .and_then(|mut scs| scs.next())
             .map(|sc| sc.with_max_sample_rate())
     }
+    /// Start the mixer playing
+    ///
+    /// Playback will stop if the mixer is dropped
     pub fn play(&mut self) -> Result<(), cpal::PlayStreamError> {
         if let Some(config) = self.default_config() {
             self.play_with_config(config)
@@ -63,6 +80,9 @@ where
             Ok(())
         }
     }
+    /// Start the mixer playing with the given config
+    ///
+    /// Playback will stop if the mixer is dropped
     pub fn play_with_config(
         &mut self,
         config: cpal::SupportedStreamConfig,
@@ -174,17 +194,21 @@ fn test() {
     sleep(Duration::from_secs(1));
 }
 
+/// Linearly interpolate two numbers
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     (1.0 - t) * a + t * b
 }
 
+/// A thread-safe, reference-counted, locked wrapper
 #[derive(Default)]
 pub struct Shared<T>(Arc<Mutex<T>>);
 
 impl<T> Shared<T> {
+    /// Create a new shared
     pub fn new(val: T) -> Self {
         Shared(Arc::new(Mutex::new(val)))
     }
+    /// Set the value
     pub fn set(&self, val: T) {
         *self.0.lock().unwrap() = val;
     }
@@ -194,6 +218,7 @@ impl<T> Shared<T>
 where
     T: Copy,
 {
+    /// Copy the value out
     pub fn get(&self) -> T {
         *self.0.lock().unwrap()
     }
@@ -203,6 +228,7 @@ impl<T> Shared<T>
 where
     T: Clone,
 {
+    /// Clone the value out
     pub fn cloned(&self) -> T {
         self.0.lock().unwrap().clone()
     }

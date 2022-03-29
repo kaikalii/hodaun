@@ -46,17 +46,22 @@ where
     }
 }
 
+/// The [`Source`] used to play sources combined in a [`Mixer`]
 pub struct MixerSource<F> {
     sources: Vec<MixedSource<F>>,
     recv: Receiver<Box<dyn Source<Frame = F> + Send + 'static>>,
 }
 
+/// An interface for combining [`Source`]s
 #[derive(Clone)]
 pub struct Mixer<F> {
     send: Sender<Box<dyn Source<Frame = F> + Send + 'static>>,
 }
 
 impl<F> Mixer<F> {
+    /// Add a [`Source`] to the mixer
+    ///
+    /// Sources that stop yielding frames are removed and dropped
     pub fn add<S>(&self, source: S)
     where
         S: Source<Frame = F> + Send + 'static,
@@ -66,6 +71,7 @@ impl<F> Mixer<F> {
 }
 
 impl<F> Mixer<F> {
+    /// Create a new mixer interface and corresponing [`Source`]
     pub fn new() -> (Mixer<F>, MixerSource<F>) {
         let (send, recv) = channel();
         (

@@ -1,10 +1,15 @@
+//! Audio sources
+
 use std::{marker::PhantomData, sync::Arc};
 
 use crate::{lerp, Shared};
 
+/// Mono [`Frame`] type
 pub type Mono = [f32; 1];
+/// Stereo [`Frame`] type
 pub type Stereo = [f32; 2];
 
+/// Convert a [`Frame`] to mono
 pub fn mono<F>(frame: F) -> Mono
 where
     F: AsRef<[f32]>,
@@ -12,16 +17,22 @@ where
     [frame.as_ref().iter().sum::<f32>() / frame.as_ref().len() as f32]
 }
 
+/// Convert a mono frame to stereo
 pub fn stereo(frame: Mono) -> Stereo {
     [frame[0]; 2]
 }
 
+/// A single multi-channel frame in an audio stream
 pub trait Frame: Default + Clone {
+    /// Get the number of audio channels
     fn channels(&self) -> usize;
+    /// Get the amplitude of a channel
     fn get_channel(&self, index: usize) -> f32;
+    /// Apply a function to each channels
     fn map<F>(self, f: F) -> Self
     where
         F: Fn(f32) -> f32;
+    /// Combine two frames by applying a function
     fn merge<F>(&mut self, other: Self, f: F)
     where
         F: Fn(f32, f32) -> f32;
@@ -56,16 +67,24 @@ where
     }
 }
 
+/// An audio source
 pub trait Source {
+    /// The [`Frame`] type
     type Frame: Frame;
+    /// Get the sample rate
     fn sample_rate(&self) -> f32;
+    /// Get the next frame
+    ///
+    /// Returning [`None`] indicates the source has no samples left
     fn next(&mut self) -> Option<Self::Frame>;
+    /// Amplify the source by some multiplier
     fn amplify(self, amp: f32) -> Amplify<Self>
     where
         Self: Sized,
     {
         Amplify { source: self, amp }
     }
+    /// Apply a low-pass filter with the given cut-off frequency
     fn low_pass<F>(self, freq: F) -> LowPass<Self>
     where
         Self: Sized,
@@ -77,12 +96,14 @@ pub trait Source {
             acc: None,
         }
     }
+    /// Transform each frame with the given function
     fn map<F>(self, f: F) -> Map<Self, F>
     where
         Self: Sized,
     {
         Map { source: self, f }
     }
+    /// Combine this source with another using the given frame-combining function
     fn zip<F, B>(self, other: B, f: F) -> Zip<Self, B, F>
     where
         Self: Sized,
@@ -97,6 +118,7 @@ pub trait Source {
             t: 0.0,
         }
     }
+    /// Keep playing this source as long as the given [`Maintainer`] is not dropped
     fn maintained(self, maintainer: &Maintainer) -> Maintained<Self>
     where
         Self: Sized,
@@ -108,6 +130,7 @@ pub trait Source {
     }
 }
 
+/// Source returned from [`Source::amplify`]
 pub struct Amplify<S> {
     source: S,
     amp: f32,
@@ -126,6 +149,7 @@ where
     }
 }
 
+/// Source that plays nothing forever
 #[derive(Debug, Clone, Copy)]
 pub struct Silence<F = [f32; 1]> {
     sample_rate: f32,
@@ -133,6 +157,7 @@ pub struct Silence<F = [f32; 1]> {
 }
 
 impl Silence {
+    /// Create new silence
     pub fn new(sample_rate: f32) -> Self {
         Silence {
             sample_rate,
@@ -154,6 +179,7 @@ where
     }
 }
 
+/// Source returned from [`Source::low_pass`]
 pub struct LowPass<S>
 where
     S: Source,
@@ -187,6 +213,7 @@ where
     }
 }
 
+/// Source returned from [`Source::map`]
 pub struct Map<S, F> {
     source: S,
     f: F,
@@ -207,6 +234,7 @@ where
     }
 }
 
+/// Source returned from [`Source::zip`]
 pub struct Zip<A, B, F>
 where
     A: Source,
@@ -252,15 +280,18 @@ where
     }
 }
 
+/// Used to coordinate the dropping of [`Source`]s
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Maintainer(Arc<()>);
 
 impl Maintainer {
+    /// Create a new maintainer
     pub fn new() -> Self {
         Self::default()
     }
 }
 
+/// Source returned from [`Source::maintained`]
 pub struct Maintained<S> {
     source: S,
     arc: Arc<()>,

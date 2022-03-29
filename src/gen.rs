@@ -1,13 +1,18 @@
+//! Wave generation
+
 use std::{f32::consts::TAU, marker::PhantomData};
 
 use rand::prelude::*;
 
 use crate::source::*;
 
+/// Defines a waveform
 pub trait Waveform {
+    /// Get the amplitude of a 1 Hz wave at the given time
     fn one_hz(time: f32) -> f32;
 }
 
+/// A [`Source`] implementation that outputs a simple wave
 #[derive(Debug, Clone, Copy)]
 pub struct Wave<W> {
     freq: f32,
@@ -17,6 +22,7 @@ pub struct Wave<W> {
 }
 
 impl<W> Wave<W> {
+    /// Create a new wave with the given frequency and sample rate
     pub fn new(freq: f32, sample_rate: f32) -> Self {
         Wave {
             freq,
@@ -43,6 +49,7 @@ where
     }
 }
 
+/// A sine waveform
 #[derive(Debug, Clone, Copy)]
 pub struct Sine;
 impl Waveform for Sine {
@@ -51,6 +58,7 @@ impl Waveform for Sine {
     }
 }
 
+/// A square waveform
 #[derive(Debug, Clone, Copy)]
 pub struct Square;
 impl Waveform for Square {
@@ -63,9 +71,12 @@ impl Waveform for Square {
     }
 }
 
+/// A sine wave source
 pub type SineWave = Wave<Sine>;
+/// A square wave source
 pub type SquareWave = Wave<Square>;
 
+/// Simple random noise source
 #[derive(Debug, Clone)]
 pub struct Noise {
     rng: SmallRng,
@@ -73,6 +84,7 @@ pub struct Noise {
 }
 
 impl Noise {
+    /// Create new noise with the given sample rate
     pub fn new(sample_rate: f32) -> Self {
         Noise {
             rng: SmallRng::from_entropy(),
