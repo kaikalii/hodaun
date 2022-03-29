@@ -1,6 +1,6 @@
 //! Audio sources
 
-use std::{marker::PhantomData, sync::Arc, time::Duration};
+use std::{collections::VecDeque, marker::PhantomData, sync::Arc, time::Duration};
 
 use crate::{lerp, Shared};
 
@@ -94,6 +94,21 @@ pub trait Source {
             duration: dur,
             elapsed: Duration::from_secs(0),
         }
+    }
+    /// Chain the source with another
+    fn chain<B>(self, next: B) -> Chain<Self::Frame>
+    where
+        Self: Sized + Send + 'static,
+        B: Sized + Send + 'static + Source<Frame = Self::Frame>,
+    {
+        let initial_sample_rate = self.sample_rate();
+        let mut chain = Chain {
+            initial_sample_rate,
+            queue: VecDeque::new(),
+        };
+        chain.queue.push_back(Box::new(self));
+        chain.queue.push_back(Box::new(next));
+        chain
     }
     /// Apply a low-pass filter with the given cut-off frequency
     fn low_pass<F>(self, freq: F) -> LowPass<Self>
@@ -212,6 +227,42 @@ where
         let frame = self.source.next()?;
         self.elapsed += Duration::from_secs_f32(1.0 / self.source.sample_rate());
         Some(frame)
+    }
+}
+
+/// Source return from [`Source::chain`]
+pub struct Chain<F> {
+    initial_sample_rate: f32,
+    queue: VecDeque<Box<dyn Source<Frame = F> + Send>>,
+}
+
+impl<F> Source for Chain<F>
+where
+    F: Frame,
+{
+    type Frame = F;
+    fn sample_rate(&self) -> f32 {
+        self.queue
+            .front()
+            .map(|source| source.sample_rate())
+            .unwrap_or(self.initial_sample_rate)
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        let front = self.queue.front_mut()?;
+        if let Some(frame) = front.next() {
+            Some(frame)
+        } else {
+            self.queue.pop_front();
+            self.next()
+        }
+    }
+    fn chain<B>(mut self, next: B) -> Chain<Self::Frame>
+    where
+        Self: Sized + Send + 'static,
+        B: Sized + Send + 'static + Source<Frame = Self::Frame>,
+    {
+        self.queue.push_back(Box::new(next));
+        self
     }
 }
 

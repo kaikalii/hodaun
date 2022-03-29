@@ -102,7 +102,7 @@ where
         {}
         Ok(())
     }
-    /// Start the mixer playing with the given config
+    /// Start the mixer playing with the given config without blocking the thread
     ///
     /// Playback will stop if the mixer is dropped
     pub fn play_with_config(
