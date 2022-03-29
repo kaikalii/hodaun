@@ -5,6 +5,6 @@ name = 'hodaun'
 version = '0.1.0'
 
 [dependencies]
-cpal = '0.13.1'
+cpal = '0.13.5'
 rand.features = ['small_rng']
-rand.version = '0.8.3'
+rand.version = '0.8.5'
