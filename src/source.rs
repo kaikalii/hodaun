@@ -1,6 +1,14 @@
 //! Audio sources
 
-use std::{collections::VecDeque, marker::PhantomData, sync::Arc, time::Duration};
+use std::{
+    collections::VecDeque,
+    marker::PhantomData,
+    sync::{
+        mpsc::{channel, Receiver, Sender},
+        Arc,
+    },
+    time::Duration,
+};
 
 use crate::{lerp, Shared};
 
@@ -154,7 +162,21 @@ pub trait Source {
             arc: Arc::clone(&maintainer.0),
         }
     }
+    /// Allow the current frame of the source to be inspected
+    fn inspect(self) -> (SourceInspector<Self::Frame>, InspectedSource<Self>)
+    where
+        Self: Sized,
+    {
+        let (send, recv) = channel();
+        (
+            SourceInspector { curr: None, recv },
+            InspectedSource { source: self, send },
+        )
+    }
 }
+
+/// A dynamic source type
+pub type DynSource<F> = Box<dyn Source<Frame = F> + Send>;
 
 /// Source returned from [`Source::amplify`]
 pub struct Amplify<S> {
@@ -233,7 +255,7 @@ where
 /// Source return from [`Source::chain`]
 pub struct Chain<F> {
     initial_sample_rate: f32,
-    queue: VecDeque<Box<dyn Source<Frame = F> + Send>>,
+    queue: VecDeque<DynSource<F>>,
 }
 
 impl<F> Source for Chain<F>
@@ -398,5 +420,42 @@ where
         } else {
             self.source.next()
         }
+    }
+}
+
+/// A source that is being inspected by a [`SourceInspector`]
+pub struct InspectedSource<S: Source> {
+    source: S,
+    send: Sender<Option<S::Frame>>,
+}
+
+/// Allows the inspection of a [`Source`]'s current frame
+pub struct SourceInspector<F> {
+    curr: Option<F>,
+    recv: Receiver<Option<F>>,
+}
+
+impl<S: Source> Source for InspectedSource<S> {
+    type Frame = S::Frame;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        let frame = self.source.next();
+        let _ = self.send.send(frame.clone());
+        frame
+    }
+}
+
+impl<F> SourceInspector<F>
+where
+    F: Frame,
+{
+    /// Read the inspected [`Source`]'s current frame
+    pub fn read(&mut self) -> Option<F> {
+        for frame in self.recv.try_iter() {
+            self.curr = frame;
+        }
+        self.curr.clone()
     }
 }
