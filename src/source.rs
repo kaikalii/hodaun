@@ -1,6 +1,6 @@
 //! Audio sources
 
-use std::{marker::PhantomData, sync::Arc};
+use std::{marker::PhantomData, sync::Arc, time::Duration};
 
 use crate::{lerp, Shared};
 
@@ -83,6 +83,17 @@ pub trait Source {
         Self: Sized,
     {
         Amplify { source: self, amp }
+    }
+    /// End the source after some duration
+    fn take(self, dur: Duration) -> Take<Self>
+    where
+        Self: Sized,
+    {
+        Take {
+            source: self,
+            duration: dur,
+            elapsed: Duration::from_secs(0),
+        }
     }
     /// Apply a low-pass filter with the given cut-off frequency
     fn low_pass<F>(self, freq: F) -> LowPass<Self>
@@ -176,6 +187,31 @@ where
     }
     fn next(&mut self) -> Option<Self::Frame> {
         Some(F::default())
+    }
+}
+
+/// Source returned from [`Source::take`]
+pub struct Take<S> {
+    source: S,
+    duration: Duration,
+    elapsed: Duration,
+}
+
+impl<S> Source for Take<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        if self.elapsed >= self.duration {
+            return None;
+        }
+        let frame = self.source.next()?;
+        self.duration += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+        Some(frame)
     }
 }
 
