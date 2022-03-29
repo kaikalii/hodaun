@@ -151,7 +151,8 @@ pub trait Source {
     {
         Maintained {
             source: self,
-            arc: Arc::clone(&maintainer.0),
+            decay_dur: maintainer.decay_dur.clone(),
+            decay_curr: Duration::default(),
         }
     }
     /// Allow the current frame of the source to be inspected
@@ -383,19 +384,28 @@ where
 
 /// Used to coordinate the dropping of [`Source`]s
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Maintainer(Arc<()>);
+pub struct Maintainer {
+    decay_dur: Arc<Duration>,
+}
 
 impl Maintainer {
     /// Create a new maintainer
     pub fn new() -> Self {
         Self::default()
     }
+    /// Create a new maintainer with the given decay duration
+    pub fn with_decay(dur: Duration) -> Self {
+        Maintainer {
+            decay_dur: Arc::new(dur),
+        }
+    }
 }
 
 /// Source returned from [`Source::maintained`]
 pub struct Maintained<S> {
     source: S,
-    arc: Arc<()>,
+    decay_dur: Arc<Duration>,
+    decay_curr: Duration,
 }
 
 impl<S> Source for Maintained<S>
@@ -407,8 +417,15 @@ where
         self.source.sample_rate()
     }
     fn next(&mut self) -> Option<Self::Frame> {
-        if Arc::strong_count(&self.arc) == 1 {
-            None
+        if Arc::strong_count(&self.decay_dur) == 1 {
+            if self.decay_curr < *self.decay_dur {
+                let amp = self.decay_curr.as_secs_f32() / self.decay_dur.as_secs_f32();
+                let frame = self.source.next()?.map(|s| s * amp);
+                self.decay_curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+                Some(frame)
+            } else {
+                None
+            }
         } else {
             self.source.next()
         }
