@@ -1,6 +1,11 @@
 //! Audio sources
 
-use std::{collections::VecDeque, marker::PhantomData, sync::Arc, time::Duration};
+use std::{
+    collections::VecDeque,
+    marker::PhantomData,
+    sync::{Arc, Weak},
+    time::Duration,
+};
 
 use crate::{lerp, Shared};
 
@@ -151,7 +156,8 @@ pub trait Source {
     {
         Maintained {
             source: self,
-            decay_dur: maintainer.decay_dur.clone(),
+            arc: Arc::downgrade(&maintainer.arc),
+            decay_dur: maintainer.decay_dur,
             decay_curr: Duration::default(),
         }
     }
@@ -197,7 +203,7 @@ pub struct Silence<F = [f32; 1]> {
     pd: PhantomData<F>,
 }
 
-impl Silence {
+impl<F> Silence<F> {
     /// Create new silence
     pub fn new(sample_rate: f32) -> Self {
         Silence {
@@ -385,7 +391,8 @@ where
 /// Used to coordinate the dropping of [`Source`]s
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Maintainer {
-    decay_dur: Arc<Duration>,
+    arc: Arc<()>,
+    decay_dur: Duration,
 }
 
 impl Maintainer {
@@ -396,15 +403,21 @@ impl Maintainer {
     /// Create a new maintainer with the given decay duration
     pub fn with_decay(dur: Duration) -> Self {
         Maintainer {
-            decay_dur: Arc::new(dur),
+            arc: Arc::new(()),
+            decay_dur: dur,
         }
     }
+}
+
+impl Drop for Maintainer {
+    fn drop(&mut self) {}
 }
 
 /// Source returned from [`Source::maintained`]
 pub struct Maintained<S> {
     source: S,
-    decay_dur: Arc<Duration>,
+    arc: Weak<()>,
+    decay_dur: Duration,
     decay_curr: Duration,
 }
 
@@ -417,9 +430,9 @@ where
         self.source.sample_rate()
     }
     fn next(&mut self) -> Option<Self::Frame> {
-        if Arc::strong_count(&self.decay_dur) == 1 {
-            if self.decay_curr < *self.decay_dur {
-                let amp = self.decay_curr.as_secs_f32() / self.decay_dur.as_secs_f32();
+        if Weak::strong_count(&self.arc) == 0 {
+            if self.decay_curr < self.decay_dur {
+                let amp = 1.0 - self.decay_curr.as_secs_f32() / self.decay_dur.as_secs_f32();
                 let frame = self.source.next()?.map(|s| s * amp);
                 self.decay_curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
                 Some(frame)
