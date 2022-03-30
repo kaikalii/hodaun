@@ -472,21 +472,20 @@ where
     fn next(&mut self) -> Option<Self::Frame> {
         let frame = self.source.next()?;
         let envelope = self.envelope.get();
-        Some(if self.curr < envelope.attack {
-            let amp = self.curr.as_secs_f32() / envelope.attack.as_secs_f32();
-            self.curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
-            frame.map(|s| s * amp)
+        let amp = if self.curr < envelope.attack {
+            self.curr.as_secs_f32() / envelope.attack.as_secs_f32()
         } else {
             let after_attack = self.curr - envelope.attack;
-            let amp = if after_attack < envelope.decay {
+            if after_attack < envelope.decay {
                 (1.0 - after_attack.as_secs_f32() / envelope.decay.as_secs_f32())
                     * (1.0 - envelope.sustain)
                     + envelope.sustain
             } else {
                 envelope.sustain
-            };
-            frame.map(|s| s * amp)
-        })
+            }
+        };
+        self.curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+        Some(frame.map(|s| s * amp))
     }
 }
 
