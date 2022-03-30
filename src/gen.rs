@@ -1,6 +1,9 @@
 //! Wave generation
 
-use std::{f32::consts::TAU, marker::PhantomData};
+use std::{
+    f32::consts::{PI, TAU},
+    marker::PhantomData,
+};
 
 use rand::prelude::*;
 
@@ -63,10 +66,11 @@ impl Waveform for Sine {
 pub struct Square;
 impl Waveform for Square {
     fn one_hz(time: f32) -> f32 {
-        if time as u64 % 2 == 0 {
-            -1.0
+        const SINE_ENERGY: f32 = 1.0 / PI;
+        if (time * 2.0) as u64 % 2 == 0 {
+            -SINE_ENERGY
         } else {
-            1.0
+            SINE_ENERGY
         }
     }
 }
