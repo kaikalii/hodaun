@@ -158,14 +158,15 @@ pub trait Source {
         }
     }
     /// Apply an attack envelope to the source
-    fn attack(self, dur: Duration) -> Attack<Self>
+    fn ads<E>(self, envelope: E) -> Ads<Self>
     where
         Self: Sized,
+        E: Into<Shared<AdsEnvelope>>,
     {
-        Attack {
+        Ads {
             source: self,
-            attack_curr: Duration::ZERO,
-            attack_dur: dur,
+            curr: Duration::ZERO,
+            envelope: envelope.into(),
         }
     }
     /// Keep playing this source as long as the given [`Maintainer`] is not dropped
@@ -176,7 +177,7 @@ pub trait Source {
         Maintained {
             source: self,
             arc: Arc::downgrade(&maintainer.arc),
-            decay_dur: maintainer.decay_dur,
+            decay_dur: maintainer.release_dur,
             decay_curr: Duration::ZERO,
         }
     }
@@ -411,7 +412,7 @@ where
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Maintainer {
     arc: Arc<()>,
-    decay_dur: Duration,
+    release_dur: Duration,
 }
 
 impl Maintainer {
@@ -419,11 +420,11 @@ impl Maintainer {
     pub fn new() -> Self {
         Self::default()
     }
-    /// Create a new maintainer with the given decay duration
-    pub fn with_decay(dur: Duration) -> Self {
+    /// Create a new maintainer with the given release duration
+    pub fn with_release(dur: Duration) -> Self {
         Maintainer {
             arc: Arc::new(()),
-            decay_dur: dur,
+            release_dur: dur,
         }
     }
 }
@@ -432,14 +433,35 @@ impl Drop for Maintainer {
     fn drop(&mut self) {}
 }
 
-/// Source returned from [`Source::attack`]
-pub struct Attack<S> {
-    source: S,
-    attack_curr: Duration,
-    attack_dur: Duration,
+/// An attack-decary-sustain evenlope
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AdsEnvelope {
+    /// The after the sound starts before it is at its maximum volume
+    pub attack: Duration,
+    /// The time between the maximum amplitude and the sustain amplitude
+    pub decay: Duration,
+    /// The sustain amplitude
+    pub sustain: f32,
 }
 
-impl<S> Source for Attack<S>
+impl Default for AdsEnvelope {
+    fn default() -> Self {
+        AdsEnvelope {
+            attack: Duration::ZERO,
+            decay: Duration::ZERO,
+            sustain: 1.0,
+        }
+    }
+}
+
+/// Source returned from [`Source::ads`]
+pub struct Ads<S> {
+    source: S,
+    curr: Duration,
+    envelope: Shared<AdsEnvelope>,
+}
+
+impl<S> Source for Ads<S>
 where
     S: Source,
 {
@@ -449,12 +471,21 @@ where
     }
     fn next(&mut self) -> Option<Self::Frame> {
         let frame = self.source.next()?;
-        Some(if self.attack_curr < self.attack_dur {
-            let amp = self.attack_curr.as_secs_f32() / self.attack_dur.as_secs_f32();
-            self.attack_curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+        let envelope = self.envelope.get();
+        Some(if self.curr < envelope.attack {
+            let amp = self.curr.as_secs_f32() / envelope.attack.as_secs_f32();
+            self.curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
             frame.map(|s| s * amp)
         } else {
-            frame
+            let after_attack = self.curr - envelope.attack;
+            let amp = if after_attack < envelope.decay {
+                (1.0 - after_attack.as_secs_f32() / envelope.decay.as_secs_f32())
+                    * (1.0 - envelope.sustain)
+                    + envelope.sustain
+            } else {
+                envelope.sustain
+            };
+            frame.map(|s| s * amp)
         })
     }
 }

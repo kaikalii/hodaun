@@ -332,3 +332,12 @@ impl<T> From<T> for Shared<T> {
         Shared::new(val)
     }
 }
+
+impl<'a, T> From<&'a T> for Shared<T>
+where
+    T: Clone,
+{
+    fn from(val: &'a T) -> Self {
+        Shared::new(val.clone())
+    }
+}
