@@ -75,10 +75,32 @@ impl Waveform for Square {
     }
 }
 
+/// A saw waveform
+#[derive(Debug, Clone, Copy)]
+pub struct Saw;
+impl Waveform for Saw {
+    fn one_hz(time: f32) -> f32 {
+        time - (time + 0.5).floor()
+    }
+}
+
+/// A triangle waveform
+#[derive(Debug, Clone, Copy)]
+pub struct Triangle;
+impl Waveform for Triangle {
+    fn one_hz(time: f32) -> f32 {
+        4.0 * (time - (time + 0.5).floor()).abs() - 1.0
+    }
+}
+
 /// A sine wave source
 pub type SineWave = Wave<Sine>;
 /// A square wave source
 pub type SquareWave = Wave<Square>;
+/// A saw wave source
+pub type SawWave = Wave<Saw>;
+/// A triangle wave source
+pub type TriangleWave = Wave<Triangle>;
 
 /// Simple random noise source
 #[derive(Debug, Clone)]
