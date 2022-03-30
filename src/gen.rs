@@ -78,11 +78,10 @@ impl Waveform for Sine {
 pub struct Square;
 impl Waveform for Square {
     fn one_hz(&self, time: f32) -> f32 {
-        const SINE_ENERGY: f32 = 1.0 / PI;
         if (time * 2.0) as u64 % 2 == 0 {
-            -SINE_ENERGY
+            -1.0
         } else {
-            SINE_ENERGY
+            1.0
         }
     }
 }
@@ -92,7 +91,7 @@ impl Waveform for Square {
 pub struct Saw;
 impl Waveform for Saw {
     fn one_hz(&self, time: f32) -> f32 {
-        time - (time + 0.5).floor()
+        2.0 * (time - (time + 0.5).floor())
     }
 }
 
@@ -101,7 +100,7 @@ impl Waveform for Saw {
 pub struct Triangle;
 impl Waveform for Triangle {
     fn one_hz(&self, time: f32) -> f32 {
-        4.0 * (time - (time + 0.5).floor()).abs() - 1.0
+        2.0 * Saw.one_hz(time).abs() - 1.0
     }
 }
 
