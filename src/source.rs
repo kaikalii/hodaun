@@ -41,6 +41,14 @@ pub trait Frame: Default + Clone {
     fn merge<F>(&mut self, other: Self, f: F)
     where
         F: Fn(f32, f32) -> f32;
+    /// Get the average amplitude
+    fn avg(&self) -> f32 {
+        let channels = self.channels();
+        (0..self.channels())
+            .map(|i| self.get_channel(i))
+            .sum::<f32>()
+            / channels as f32
+    }
 }
 
 impl<T> Frame for T
@@ -511,7 +519,7 @@ where
     F: Frame,
 {
     /// Read the inspected [`Source`]'s current frame
-    pub fn read(&mut self) -> Option<F> {
+    pub fn read(&self) -> Option<F> {
         self.curr.cloned()
     }
 }
