@@ -1,9 +1,6 @@
 //! Wave generation
 
-use std::{
-    f32::consts::{PI, TAU},
-    marker::PhantomData,
-};
+use std::f32::consts::{PI, TAU};
 
 use rand::prelude::*;
 
@@ -12,26 +9,41 @@ use crate::source::*;
 /// Defines a waveform
 pub trait Waveform {
     /// Get the amplitude of a 1 Hz wave at the given time
-    fn one_hz(time: f32) -> f32;
+    fn one_hz(&self, time: f32) -> f32;
 }
 
 /// A [`Source`] implementation that outputs a simple wave
 #[derive(Debug, Clone, Copy)]
 pub struct Wave<W> {
+    waveform: W,
     freq: f32,
     sample_rate: f32,
     time: f32,
-    pd: PhantomData<W>,
 }
 
 impl<W> Wave<W> {
-    /// Create a new wave with the given frequency and sample rate
-    pub fn new(freq: f32, sample_rate: f32) -> Self {
+    /// Create a new wave with the given waveform, frequency, and sample rate
+    pub fn with(waveform: W, freq: f32, sample_rate: f32) -> Self {
         Wave {
+            waveform,
             freq,
             sample_rate,
             time: 0.0,
-            pd: PhantomData,
+        }
+    }
+}
+
+impl<W> Wave<W>
+where
+    W: Default,
+{
+    /// Create a new wave with the given frequency and sample rate
+    pub fn new(freq: f32, sample_rate: f32) -> Self {
+        Wave {
+            waveform: W::default(),
+            freq,
+            sample_rate,
+            time: 0.0,
         }
     }
 }
@@ -45,7 +57,7 @@ where
         self.sample_rate
     }
     fn next(&mut self) -> Option<Self::Frame> {
-        let res = W::one_hz(self.time);
+        let res = self.waveform.one_hz(self.time);
         self.time += self.freq / self.sample_rate;
         // Some([dbg!(res)])
         Some([res])
@@ -53,19 +65,19 @@ where
 }
 
 /// A sine waveform
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Sine;
 impl Waveform for Sine {
-    fn one_hz(time: f32) -> f32 {
+    fn one_hz(&self, time: f32) -> f32 {
         (time * TAU).sin()
     }
 }
 
 /// A square waveform
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Square;
 impl Waveform for Square {
-    fn one_hz(time: f32) -> f32 {
+    fn one_hz(&self, time: f32) -> f32 {
         const SINE_ENERGY: f32 = 1.0 / PI;
         if (time * 2.0) as u64 % 2 == 0 {
             -SINE_ENERGY
@@ -76,19 +88,19 @@ impl Waveform for Square {
 }
 
 /// A saw waveform
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Saw;
 impl Waveform for Saw {
-    fn one_hz(time: f32) -> f32 {
+    fn one_hz(&self, time: f32) -> f32 {
         time - (time + 0.5).floor()
     }
 }
 
 /// A triangle waveform
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct Triangle;
 impl Waveform for Triangle {
-    fn one_hz(time: f32) -> f32 {
+    fn one_hz(&self, time: f32) -> f32 {
         4.0 * (time - (time + 0.5).floor()).abs() - 1.0
     }
 }
