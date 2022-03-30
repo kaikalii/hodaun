@@ -149,6 +149,17 @@ pub trait Source {
             t: 0.0,
         }
     }
+    /// Apply an attack envelope to the source
+    fn attack(self, dur: Duration) -> Attack<Self>
+    where
+        Self: Sized,
+    {
+        Attack {
+            source: self,
+            attack_curr: Duration::ZERO,
+            attack_dur: dur,
+        }
+    }
     /// Keep playing this source as long as the given [`Maintainer`] is not dropped
     fn maintained(self, maintainer: &Maintainer) -> Maintained<Self>
     where
@@ -158,7 +169,7 @@ pub trait Source {
             source: self,
             arc: Arc::downgrade(&maintainer.arc),
             decay_dur: maintainer.decay_dur,
-            decay_curr: Duration::default(),
+            decay_curr: Duration::ZERO,
         }
     }
     /// Allow the current frame of the source to be inspected
@@ -411,6 +422,33 @@ impl Maintainer {
 
 impl Drop for Maintainer {
     fn drop(&mut self) {}
+}
+
+/// Source returned from [`Source::attack`]
+pub struct Attack<S> {
+    source: S,
+    attack_curr: Duration,
+    attack_dur: Duration,
+}
+
+impl<S> Source for Attack<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        let frame = self.source.next()?;
+        Some(if self.attack_curr < self.attack_dur {
+            let amp = self.attack_curr.as_secs_f32() / self.attack_dur.as_secs_f32();
+            self.attack_curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+            frame.map(|s| s * amp)
+        } else {
+            frame
+        })
+    }
 }
 
 /// Source returned from [`Source::maintained`]
