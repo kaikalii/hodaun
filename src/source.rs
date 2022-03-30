@@ -157,7 +157,7 @@ pub trait Source {
             t: 0.0,
         }
     }
-    /// Apply an attack envelope to the source
+    /// Apply an attack-decay-sustain envelope to the source
     fn ads<E>(self, envelope: E) -> Ads<Self>
     where
         Self: Sized,
@@ -177,8 +177,8 @@ pub trait Source {
         Maintained {
             source: self,
             arc: Arc::downgrade(&maintainer.arc),
-            decay_dur: maintainer.release_dur,
-            decay_curr: Duration::ZERO,
+            release_dur: maintainer.release_dur.clone(),
+            release_curr: Duration::ZERO,
         }
     }
     /// Allow the current frame of the source to be inspected
@@ -412,7 +412,7 @@ where
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Maintainer {
     arc: Arc<()>,
-    release_dur: Duration,
+    release_dur: Shared<Duration>,
 }
 
 impl Maintainer {
@@ -421,10 +421,10 @@ impl Maintainer {
         Self::default()
     }
     /// Create a new maintainer with the given release duration
-    pub fn with_release(dur: Duration) -> Self {
+    pub fn with_release(dur: impl Into<Shared<Duration>>) -> Self {
         Maintainer {
             arc: Arc::new(()),
-            release_dur: dur,
+            release_dur: dur.into(),
         }
     }
 }
@@ -494,8 +494,8 @@ where
 pub struct Maintained<S> {
     source: S,
     arc: Weak<()>,
-    decay_dur: Duration,
-    decay_curr: Duration,
+    release_dur: Shared<Duration>,
+    release_curr: Duration,
 }
 
 impl<S> Source for Maintained<S>
@@ -508,10 +508,11 @@ where
     }
     fn next(&mut self) -> Option<Self::Frame> {
         if Weak::strong_count(&self.arc) == 0 {
-            if self.decay_curr < self.decay_dur {
-                let amp = 1.0 - self.decay_curr.as_secs_f32() / self.decay_dur.as_secs_f32();
+            let release_dur = self.release_dur.get();
+            if self.release_curr < release_dur {
+                let amp = 1.0 - self.release_curr.as_secs_f32() / release_dur.as_secs_f32();
                 let frame = self.source.next()?.map(|s| s * amp);
-                self.decay_curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+                self.release_curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
                 Some(frame)
             } else {
                 None
