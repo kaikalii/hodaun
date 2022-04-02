@@ -47,6 +47,19 @@ impl<F> DeviceMixer<F> {
     pub fn with_default_device() -> Option<Self> {
         default_output_device().map(Self::new)
     }
+    /// Get the default supported stream config from the mixer
+    pub fn default_config(&self) -> Option<cpal::SupportedStreamConfig> {
+        self.device
+            .supported_output_configs()
+            .ok()
+            .and_then(|mut scs| scs.next())
+            .map(|sc| sc.with_max_sample_rate())
+    }
+    /// Get the sample rate of the default stream config
+    pub fn default_sample_rate(&self) -> Option<f32> {
+        self.default_config()
+            .map(|config| config.sample_rate().0 as f32)
+    }
 }
 
 impl<F> DeviceMixer<F>
@@ -61,14 +74,6 @@ where
         S: Source<Frame = F> + Send + 'static,
     {
         self.sources.lock().unwrap().push(MixedSource::new(source));
-    }
-    /// Get the default supported stream config from the mixer
-    pub fn default_config(&self) -> Option<cpal::SupportedStreamConfig> {
-        self.device
-            .supported_output_configs()
-            .ok()
-            .and_then(|mut scs| scs.next())
-            .map(|sc| sc.with_max_sample_rate())
     }
     /// Start the mixer playing without blocking the thread
     ///
