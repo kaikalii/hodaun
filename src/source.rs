@@ -91,11 +91,31 @@ pub trait Source {
     /// Returning [`None`] indicates the source has no samples left
     fn next(&mut self) -> Option<Self::Frame>;
     /// Amplify the source by some multiplier
-    fn amplify(self, amp: f32) -> Amplify<Self>
+    fn amplify<A>(self, amp: A) -> Amplify<Self>
     where
         Self: Sized,
+        A: Into<Shared<f32>>,
     {
-        Amplify { source: self, amp }
+        Amplify {
+            source: self,
+            amp: amp.into(),
+        }
+    }
+    /// Normalize the amplitude of the source
+    ///
+    /// The source will be amplified based on the average amplitude of
+    /// of previous frames
+    fn normalize<A>(self, target_amp: A, running_average_dur: Duration) -> Normalize<Self>
+    where
+        Self: Sized,
+        A: Into<Shared<f32>>,
+    {
+        Normalize {
+            source: self,
+            target_amp: target_amp.into(),
+            amp_mul: 1.0,
+            running_avg_dur: running_average_dur.as_secs_f32(),
+        }
     }
     /// End the source after some duration
     fn take(self, dur: Duration) -> Take<Self>
@@ -200,7 +220,7 @@ pub type DynSource<F> = Box<dyn Source<Frame = F> + Send>;
 /// Source returned from [`Source::amplify`]
 pub struct Amplify<S> {
     source: S,
-    amp: f32,
+    amp: Shared<f32>,
 }
 
 impl<S> Source for Amplify<S>
@@ -212,7 +232,36 @@ where
         self.source.sample_rate()
     }
     fn next(&mut self) -> Option<Self::Frame> {
-        self.source.next().map(|frame| frame.map(|a| a * self.amp))
+        self.source
+            .next()
+            .map(|frame| frame.map(|a| a * self.amp.get()))
+    }
+}
+
+/// Source returned from [`Source::normalized`]
+pub struct Normalize<S> {
+    source: S,
+    target_amp: Shared<f32>,
+    amp_mul: f32,
+    running_avg_dur: f32,
+}
+
+impl<S> Source for Normalize<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        let frame = self.source.next()?;
+        let t = 1.0 / (self.source.sample_rate() * self.running_avg_dur);
+        let target = self.target_amp.get();
+        let amp = target / self.amp_mul;
+        let new_amp = (1.0 - t) * amp + t * frame.avg().abs();
+        self.amp_mul = target / new_amp;
+        Some(frame.map(|a| a * self.amp_mul))
     }
 }
 
