@@ -5,7 +5,11 @@ name = 'hodaun'
 version = '0.1.0'
 
 [dependencies]
-cpal = '0.13.5'
+cpal = {version = '0.13.5', optional = true}
 crossbeam-channel = '0.5.4'
 rand.features = ['small_rng']
 rand.version = '0.8.5'
+
+[features]
+default = ['output']
+output = ['cpal']
