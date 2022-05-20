@@ -117,19 +117,19 @@ where
         let sample_format = config.sample_format();
         let config = cpal::StreamConfig::from(config);
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
+        macro_rules! output_stream {
+            ($sample:ty) => {
+                self.device.build_output_stream(
+                    &config,
+                    self.write_sources::<$sample>(&config),
+                    err_fn,
+                )
+            };
+        }
         let stream = match sample_format {
-            cpal::SampleFormat::F32 => {
-                self.device
-                    .build_output_stream(&config, self.write_sources::<f32>(&config), err_fn)
-            }
-            cpal::SampleFormat::I16 => {
-                self.device
-                    .build_output_stream(&config, self.write_sources::<i16>(&config), err_fn)
-            }
-            cpal::SampleFormat::U16 => {
-                self.device
-                    .build_output_stream(&config, self.write_sources::<u16>(&config), err_fn)
-            }
+            cpal::SampleFormat::F32 => output_stream!(f32),
+            cpal::SampleFormat::I16 => output_stream!(i16),
+            cpal::SampleFormat::U16 => output_stream!(u16),
         }
         .unwrap();
         stream.play()?;
@@ -158,7 +158,7 @@ where
                         continue 'sources_loop;
                     };
                     while i < channels as usize && b < buffer.len() {
-                        let c = i % frame.channels();
+                        let c = i % F::CHANNELS;
                         let a = frame.get_channel(c);
                         buffer[b] += A::from_f32(a);
                         i += 1;
@@ -227,6 +227,9 @@ pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
 }
 
 /// A thread-safe, reference-counted, locked wrapper
+///
+/// This is mostly used to allow audio source parameters
+/// to be changed while the source is playing.
 #[derive(Default)]
 pub struct Shared<T>(Arc<Mutex<T>>);
 

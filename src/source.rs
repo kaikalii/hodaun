@@ -27,12 +27,14 @@ pub fn stereo(frame: Mono) -> Stereo {
     [frame[0]; 2]
 }
 
-/// A single multi-channel frame in an audio stream
+/// A single multi-channel frame in an audio source
 pub trait Frame: Default + Clone {
-    /// Get the number of audio channels
-    fn channels(&self) -> usize;
+    /// The number of audio channels
+    const CHANNELS: usize;
     /// Get the amplitude of a channel
     fn get_channel(&self, index: usize) -> f32;
+    /// Set the amplitude of a channel
+    fn set_channel(&mut self, index: usize, amplitude: f32);
     /// Apply a function to each channels
     fn map<F>(self, f: F) -> Self
     where
@@ -43,44 +45,69 @@ pub trait Frame: Default + Clone {
         F: Fn(f32, f32) -> f32;
     /// Get the average amplitude
     fn avg(&self) -> f32 {
-        let channels = self.channels();
-        (0..self.channels())
+        let channels = Self::CHANNELS;
+        (0..Self::CHANNELS)
             .map(|i| self.get_channel(i))
             .sum::<f32>()
             / channels as f32
     }
 }
 
-impl<T> Frame for T
+impl<const N: usize> Frame for [f32; N]
 where
-    T: Default + Clone + AsRef<[f32]> + AsMut<[f32]> + Send + 'static,
+    Self: Default,
 {
-    fn channels(&self) -> usize {
-        self.as_ref().len()
-    }
+    const CHANNELS: usize = N;
     fn get_channel(&self, index: usize) -> f32 {
-        self.as_ref()[index % self.channels()]
+        self[index]
     }
-    fn map<F>(mut self, f: F) -> Self
+    fn set_channel(&mut self, index: usize, amplitude: f32) {
+        self[index] = amplitude;
+    }
+    fn map<F>(self, f: F) -> Self
     where
         F: Fn(f32) -> f32,
     {
-        for a in self.as_mut() {
-            *a = f(*a);
-        }
-        self
+        self.map(f)
     }
     fn merge<F>(&mut self, other: Self, f: F)
     where
         F: Fn(f32, f32) -> f32,
     {
-        for (a, b) in self.as_mut().iter_mut().zip(other.as_ref()) {
-            *a = f(*a, *b);
+        for (a, b) in self.iter_mut().zip(other) {
+            *a = f(*a, b);
         }
     }
 }
 
-/// An audio source
+/// An audio source with a dynamic frame size
+///
+/// This is usually only used for audio sources whose channel count
+/// is only known at runtime, like audio input.
+pub trait UnrolledSource: Iterator<Item = f32> {
+    /// Get the sample rate
+    fn sample_rate(&self) -> f32;
+    /// Get the number of audio channels
+    fn channels(&self) -> usize;
+    /// Resample this source to have a static frame size
+    ///
+    /// For a frame size of 1, the source samples are averaged.
+    /// If there is only one source channel, then that channel's
+    /// amplitude is duplicated to all frame channels. In all other
+    /// cases, the amplitudes of source channels that excede the
+    /// frame's channel count are discarded.
+    fn resample<F>(self) -> Resample<Self, F>
+    where
+        Self: Sized,
+    {
+        Resample {
+            source: self,
+            pd: PhantomData,
+        }
+    }
+}
+
+/// An audio source with a static frame size
 pub trait Source {
     /// The [`Frame`] type
     type Frame: Frame;
@@ -601,5 +628,68 @@ where
     /// Read the inspected [`Source`]'s current frame
     pub fn read(&self) -> Option<F> {
         self.curr.cloned()
+    }
+}
+
+/// Source that resamples a dynamic source to have a fixed frame size
+pub struct Resample<S, F> {
+    source: S,
+    pd: PhantomData<F>,
+}
+
+impl<S, F> Source for Resample<S, F>
+where
+    S: UnrolledSource,
+    F: Frame,
+{
+    type Frame = F;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        let source_channels = self.source.channels();
+        let mut sample = F::default();
+        match F::CHANNELS {
+            // For empty output just take all the source samples
+            0 => {
+                if self.source.by_ref().take(source_channels).count() < source_channels {
+                    return None;
+                }
+            }
+            // For mono output, use the average of all source samples
+            1 => {
+                let mut sum = 0.0;
+                let mut count = 0;
+                for s in self.source.by_ref().take(source_channels) {
+                    count += 1;
+                    sum += s;
+                }
+                if count < source_channels {
+                    return None;
+                }
+                sample.set_channel(0, sum / count as f32);
+            }
+            // For mono input and multi output, fill every output channel with the input one
+            n if source_channels == 1 => {
+                let amplitude = self.source.next()?;
+                for i in 0..n {
+                    sample.set_channel(i, amplitude);
+                }
+            }
+            // For multi input and output, discard extra input samples
+            n => {
+                let mut count = 0;
+                for (i, amplitude) in self.source.by_ref().take(source_channels).enumerate() {
+                    count += 1;
+                    if i < n {
+                        sample.set_channel(i, amplitude);
+                    }
+                }
+                if count < source_channels {
+                    return None;
+                }
+            }
+        }
+        Some(sample)
     }
 }
