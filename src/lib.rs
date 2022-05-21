@@ -5,10 +5,13 @@ A crate to simplify audio output
 */
 
 pub mod gen;
+
+#[cfg(any(feature = "input", feature = "output"))]
 mod io;
 mod mixer;
 pub mod source;
 
+#[cfg_attr(docsrs, doc(cfg(any(feature = "input", feature = "output"))))]
 pub use io::*;
 pub use mixer::*;
 #[doc(inline)]
@@ -51,7 +54,7 @@ impl Amplitude for i16 {
 #[test]
 fn test() {
     use std::{thread::sleep, time::Duration};
-    let mut mixer = DeviceMixer::with_default_device().unwrap();
+    let mut mixer = OutputDeviceMixer::with_default_device().unwrap();
     mixer.add(gen::SineWave::new(220.0, 32000.0).zip(
         gen::Noise::new(32000.0),
         // gen::SineWave::new(277.18, 44100.0),

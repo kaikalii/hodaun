@@ -2,49 +2,26 @@ use std::sync::{Arc, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use crate::{Amplitude, Frame, MixedSource, MixerInterface, Source};
+use crate::{
+    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame, MixedSource,
+    MixerInterface, Source,
+};
 
 /// Get the default output device
 pub fn default_output_device() -> Option<cpal::Device> {
     cpal::default_host().default_output_device()
 }
 
+type OutputDeviceMixerSources<F> = Arc<Mutex<Vec<MixedSource<F>>>>;
+
 /// Mixes audio sources and outputs them to a device
-pub struct DeviceMixer<F> {
-    device: cpal::Device,
-    sources: Arc<Mutex<Vec<MixedSource<F>>>>,
-    stream: Option<cpal::Stream>,
+pub struct OutputDeviceMixer<F> {
+    sources: OutputDeviceMixerSources<F>,
+    stream: cpal::Stream,
+    sample_rate: u32,
 }
 
-impl<F> DeviceMixer<F> {
-    /// Create a new [`DeviceMixer`] that will output on the given device
-    pub fn new(device: cpal::Device) -> Self {
-        DeviceMixer {
-            device,
-            sources: Default::default(),
-            stream: None,
-        }
-    }
-    /// Create a new [`DeviceMixer`] that will output on the default output device
-    pub fn with_default_device() -> Option<Self> {
-        default_output_device().map(Self::new)
-    }
-    /// Get the default supported stream config from the mixer
-    pub fn default_config(&self) -> Option<cpal::SupportedStreamConfig> {
-        self.device
-            .supported_output_configs()
-            .ok()
-            .and_then(|mut scs| scs.next())
-            .map(|sc| sc.with_max_sample_rate())
-    }
-    /// Get the sample rate of the default stream config
-    pub fn default_sample_rate(&self) -> Option<f32> {
-        self.default_config()
-            .map(|config| config.sample_rate().0 as f32)
-    }
-}
-
-impl<F> MixerInterface for DeviceMixer<F>
+impl<F> MixerInterface for OutputDeviceMixer<F>
 where
     F: Frame + Send + 'static,
 {
@@ -57,57 +34,38 @@ where
     }
 }
 
-impl<F> DeviceMixer<F>
+impl<F> OutputDeviceMixer<F>
 where
     F: Frame + Send + 'static,
 {
-    /// Start the mixer playing without blocking the thread
-    ///
-    /// Playback will stop if the mixer is dropped
-    pub fn play(&mut self) -> Result<(), cpal::PlayStreamError> {
-        if let Some(config) = self.default_config() {
-            self.play_with_config(config)
+    /// Create a mixer using the default output device
+    pub fn with_default_device() -> BuildSystemAudioResult<Self> {
+        DeviceIoBuilder::default_output().build_output()
+    }
+    /// Get the sample rate
+    pub fn sample_rate(&self) -> f32 {
+        self.sample_rate as f32
+    }
+    pub(crate) fn from_builder(builder: DeviceIoBuilder) -> BuildSystemAudioResult<Self> {
+        let device = if let Some(device) = builder.device {
+            device
         } else {
-            Ok(())
-        }
-    }
-    /// Play the mixer, blocking the thread until all sources have finished
-    pub fn blocking_play(&mut self) -> Result<(), cpal::PlayStreamError> {
-        if let Some(config) = self.default_config() {
-            self.blocking_play_with_config(config)?;
-        }
-        Ok(())
-    }
-    /// Play the mixer with the given config, blocking the thread until all sources have finished
-    pub fn blocking_play_with_config(
-        &mut self,
-        config: cpal::SupportedStreamConfig,
-    ) -> Result<(), cpal::PlayStreamError> {
-        self.play_with_config(config)?;
-        while self
-            .sources
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|source| !source.finished())
-        {}
-        Ok(())
-    }
-    /// Start the mixer playing with the given config without blocking the thread
-    ///
-    /// Playback will stop if the mixer is dropped
-    pub fn play_with_config(
-        &mut self,
-        config: cpal::SupportedStreamConfig,
-    ) -> Result<(), cpal::PlayStreamError> {
+            default_output_device().ok_or(BuildSystemAudioError::NoDevice)?
+        };
+        let config = if let Some(config) = builder.config {
+            config
+        } else {
+            device.default_output_config()?
+        };
         let sample_format = config.sample_format();
         let config = cpal::StreamConfig::from(config);
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
+        let sources = OutputDeviceMixerSources::default();
         macro_rules! output_stream {
             ($sample:ty) => {
-                self.device.build_output_stream(
+                device.build_output_stream(
                     &config,
-                    self.write_sources::<$sample>(&config),
+                    write_sources::<F, $sample>(&sources, &config),
                     err_fn,
                 )
             };
@@ -118,46 +76,68 @@ where
             cpal::SampleFormat::U16 => output_stream!(u16),
         }
         .unwrap();
-        stream.play()?;
-        self.stream = Some(stream);
+        Ok(OutputDeviceMixer {
+            sources,
+            stream,
+            sample_rate: config.sample_rate.0,
+        })
+    }
+    /// Start the mixer playing without blocking the thread
+    ///
+    /// Playback will stop if the mixer is dropped
+    pub fn play(&mut self) -> Result<(), cpal::PlayStreamError> {
+        self.stream.play()
+    }
+    /// Play the mixer, blocking the thread until all sources have finished
+    pub fn play_blocking(&mut self) -> Result<(), cpal::PlayStreamError> {
+        self.play()?;
+        while self
+            .sources
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|source| !source.finished())
+        {}
         Ok(())
     }
-    fn write_sources<A>(
-        &self,
-        config: &cpal::StreamConfig,
-    ) -> impl FnMut(&mut [A], &cpal::OutputCallbackInfo)
-    where
-        A: Amplitude,
-    {
-        let mut i = 0;
-        let channels = config.channels as usize;
-        let sample_rate = config.sample_rate.0 as f32;
-        let sources = Arc::clone(&self.sources);
-        move |buffer, _| {
-            buffer.fill(A::MIDPOINT);
-            'sources_loop: for ms in &mut *sources.lock().unwrap() {
-                let mut b = 0;
-                loop {
-                    let frame = if let Some(frame) = ms.frame() {
-                        frame
-                    } else {
-                        continue 'sources_loop;
-                    };
-                    while i < channels as usize && b < buffer.len() {
-                        let c = i % F::CHANNELS;
-                        let a = frame.get_channel(c);
-                        buffer[b] += A::from_f32(a);
-                        i += 1;
-                        b += 1;
-                    }
-                    ms.advance(sample_rate);
-                    if i == channels as usize {
-                        i = 0;
-                    }
-                    if b == buffer.len() {
-                        i = 0;
-                        break;
-                    }
+}
+
+fn write_sources<F, A>(
+    sources: &OutputDeviceMixerSources<F>,
+    config: &cpal::StreamConfig,
+) -> impl FnMut(&mut [A], &cpal::OutputCallbackInfo)
+where
+    F: Frame,
+    A: Amplitude,
+{
+    let mut i = 0;
+    let channels = config.channels as usize;
+    let sample_rate = config.sample_rate.0 as f32;
+    let sources = Arc::clone(sources);
+    move |buffer, _| {
+        buffer.fill(A::MIDPOINT);
+        'sources_loop: for ms in &mut *sources.lock().unwrap() {
+            let mut b = 0;
+            loop {
+                let frame = if let Some(frame) = ms.frame() {
+                    frame
+                } else {
+                    continue 'sources_loop;
+                };
+                while i < channels as usize && b < buffer.len() {
+                    let c = i % F::CHANNELS;
+                    let a = frame.get_channel(c);
+                    buffer[b] += A::from_f32(a);
+                    i += 1;
+                    b += 1;
+                }
+                ms.advance(sample_rate);
+                if i == channels as usize {
+                    i = 0;
+                }
+                if b == buffer.len() {
+                    i = 0;
+                    break;
                 }
             }
         }
