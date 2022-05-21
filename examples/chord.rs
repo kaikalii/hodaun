@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use hodaun::{gen::SineWave, DeviceMixer, Mixer, Mono, Source};
+use hodaun::{gen::SineWave, DeviceMixer, Mixer, MixerInterface, Mono, Source};
 
 fn main() {
     // Initializer the output and a chord mixer

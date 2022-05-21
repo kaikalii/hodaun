@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
-use crate::{Amplitude, Frame, MixedSource, Source};
+use crate::{Amplitude, Frame, MixedSource, MixerInterface, Source};
 
 /// Get the default output device
 pub fn default_output_device() -> Option<cpal::Device> {
@@ -44,19 +44,23 @@ impl<F> DeviceMixer<F> {
     }
 }
 
-impl<F> DeviceMixer<F>
+impl<F> MixerInterface for DeviceMixer<F>
 where
     F: Frame + Send + 'static,
 {
-    /// Add a [`Source`] to the mixer
-    ///
-    /// Sources that stop yielding frames are removed and dropped
-    pub fn add<S>(&self, source: S)
+    type Frame = F;
+    fn add<S>(&self, source: S)
     where
         S: Source<Frame = F> + Send + 'static,
     {
         self.sources.lock().unwrap().push(MixedSource::new(source));
     }
+}
+
+impl<F> DeviceMixer<F>
+where
+    F: Frame + Send + 'static,
+{
     /// Start the mixer playing without blocking the thread
     ///
     /// Playback will stop if the mixer is dropped

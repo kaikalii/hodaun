@@ -46,25 +46,39 @@ where
     }
 }
 
+/// Trait for combining [`Source`]s
+pub trait MixerInterface {
+    /// The frame type
+    type Frame: Frame;
+    /// Add a source to the mixer
+    fn add<S>(&self, source: S)
+    where
+        S: Source<Frame = Self::Frame> + Send + 'static;
+}
+
 /// The [`Source`] used to play sources combined in a [`Mixer`]
 pub struct MixerSource<F> {
     sources: Vec<MixedSource<F>>,
     recv: Receiver<Box<dyn Source<Frame = F> + Send + 'static>>,
 }
 
-/// An interface for combining [`Source`]s
+/// An interface for combining [`Source`]s into a new [`Source`]
+///
+/// [`Mixer`] is the interface, which implements [`MixerInterface`].
+/// [`MixerSource`] is the actual [`Source`].
 #[derive(Clone)]
 pub struct Mixer<F> {
     send: Sender<Box<dyn Source<Frame = F> + Send + 'static>>,
 }
 
-impl<F> Mixer<F> {
-    /// Add a [`Source`] to the mixer
-    ///
-    /// Sources that stop yielding frames are removed and dropped
-    pub fn add<S>(&self, source: S)
+impl<F> MixerInterface for Mixer<F>
+where
+    F: Frame,
+{
+    type Frame = F;
+    fn add<S>(&self, source: S)
     where
-        S: Source<Frame = F> + Send + 'static,
+        S: Source<Frame = Self::Frame> + Send + 'static,
     {
         let _ = self.send.send(Box::new(source));
     }

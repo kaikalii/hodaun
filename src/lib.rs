@@ -5,25 +5,20 @@ A crate to simplify audio output
 */
 
 pub mod gen;
+mod io;
 mod mixer;
-#[cfg(feature = "output")]
-mod output;
 pub mod source;
 
+pub use io::*;
+pub use mixer::*;
+#[doc(inline)]
+pub use source::{mono, stereo, Frame, Maintainer, Mono, Silence, Source, Stereo};
 use std::{
     cmp::Ordering,
     fmt,
     hash::{Hash, Hasher},
     sync::{Arc, Mutex},
 };
-
-#[cfg(feature = "output")]
-pub use cpal;
-pub use mixer::*;
-#[cfg(feature = "output")]
-pub use output::*;
-#[doc(inline)]
-pub use source::{mono, stereo, Frame, Maintainer, Mono, Silence, Source, Stereo};
 
 trait Amplitude: Clone + std::ops::AddAssign<Self> {
     const MIDPOINT: Self;
