@@ -11,6 +11,7 @@ mod io;
 mod mixer;
 pub mod source;
 
+#[cfg(any(feature = "input", feature = "output"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "input", feature = "output"))))]
 pub use io::*;
 pub use mixer::*;

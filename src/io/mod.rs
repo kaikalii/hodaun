@@ -37,15 +37,11 @@ pub enum BuildSystemAudioError {
 }
 
 /// A result type for trying to build a [`SystemAudio`]
-#[cfg(feature = "input")]
-#[cfg_attr(docsrs, doc(cfg(feature = "input")))]
 pub type BuildSystemAudioResult<T> = Result<T, BuildSystemAudioError>;
 
 /**
 A builder for creating [`InputDeviceSource`]s and [`OutputDeviceMixer`]s
 */
-#[cfg(feature = "input")]
-#[cfg_attr(docsrs, doc(cfg(feature = "input")))]
 #[derive(Default)]
 pub struct DeviceIoBuilder {
     /// The device to use. If not set, the default device will be used.
@@ -54,9 +50,9 @@ pub struct DeviceIoBuilder {
     pub config: Option<SupportedStreamConfig>,
 }
 
-#[cfg(feature = "input")]
 impl DeviceIoBuilder {
     /// Initialize a builder with the default input device and stream configuration
+    #[cfg(feature = "input")]
     pub fn default_input() -> Self {
         let device = default_input_device();
         let config = device
@@ -65,6 +61,7 @@ impl DeviceIoBuilder {
         DeviceIoBuilder { device, config }
     }
     /// Initialize a builder with the default output device and stream configuration
+    #[cfg(feature = "output")]
     pub fn default_output() -> Self {
         let device = default_output_device();
         let config = device
