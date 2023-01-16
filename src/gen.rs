@@ -9,6 +9,8 @@ use crate::source::*;
 /// Defines a waveform
 pub trait Waveform {
     /// Get the amplitude of a 1 Hz wave at the given time
+    ///
+    /// This should be in the range [-1.0, 1.0]
     fn one_hz(&self, time: f32) -> f32;
 }
 

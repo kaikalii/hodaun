@@ -53,6 +53,28 @@ pub trait Frame: Default + Clone {
     }
 }
 
+impl Frame for f32 {
+    const CHANNELS: usize = 1;
+    fn get_channel(&self, _index: usize) -> f32 {
+        *self
+    }
+    fn set_channel(&mut self, _index: usize, amplitude: f32) {
+        *self = amplitude;
+    }
+    fn map<F>(self, f: F) -> Self
+    where
+        F: Fn(f32) -> f32,
+    {
+        f(self)
+    }
+    fn merge<F>(&mut self, other: Self, f: F)
+    where
+        F: Fn(f32, f32) -> f32,
+    {
+        *self = f(*self, other);
+    }
+}
+
 impl<const N: usize> Frame for [f32; N]
 where
     Self: Default,
@@ -217,6 +239,18 @@ pub trait Source {
             curr_b: None,
             f,
             t: 0.0,
+        }
+    }
+    /// Apply a pan to the source
+    ///
+    /// Non-mono sources will be averaged before panning
+    fn pan(self, pan: impl Into<Shared<f32>>) -> Pan<Self>
+    where
+        Self: Sized,
+    {
+        Pan {
+            source: self,
+            pan: pan.into(),
         }
     }
     /// Apply an attack-decay-sustain envelope to the source
@@ -505,6 +539,31 @@ where
             self.curr_b.clone()?
         };
         Some((self.f)(a, b))
+    }
+}
+
+/// Source returned from [`Source::pan`]
+pub struct Pan<S> {
+    source: S,
+    pan: Shared<f32>,
+}
+
+impl<S> Source for Pan<S>
+where
+    S: Source,
+{
+    type Frame = Stereo;
+    fn sample_rate(&self) -> f32 {
+        self.source.sample_rate()
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        self.source.next().map(|frame| {
+            let frame = frame.avg();
+            let pan = self.pan.get();
+            let left = frame * (1.0 - pan);
+            let right = frame * pan;
+            [left, right]
+        })
     }
 }
 
