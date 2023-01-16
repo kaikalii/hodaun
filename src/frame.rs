@@ -28,7 +28,7 @@ pub trait Frame: Clone {
     /// Apply a function to each channels
     fn map(self, f: impl Fn(f32) -> f32) -> Self;
     /// Combine two frames by applying a function
-    fn merge(self, other: Self, f: impl Fn(f32, f32) -> f32) -> Self;
+    fn merge(&mut self, other: Self, f: impl Fn(f32, f32) -> f32);
     /// Get the average amplitude
     fn avg(&self) -> f32 {
         let channels = Self::CHANNELS;
@@ -38,8 +38,9 @@ pub trait Frame: Clone {
             / channels as f32
     }
     /// Add two frames
-    fn add(self, other: Self) -> Self {
-        self.merge(other, Add::add)
+    fn add(mut self, other: Self) -> Self {
+        self.merge(other, Add::add);
+        self
     }
     /// Write the frame to a channel slice
     ///
@@ -71,8 +72,8 @@ impl Frame for f32 {
     fn map(self, f: impl Fn(f32) -> f32) -> Self {
         f(self)
     }
-    fn merge(self, other: Self, f: impl Fn(f32, f32) -> f32) -> Self {
-        f(self, other)
+    fn merge(&mut self, other: Self, f: impl Fn(f32, f32) -> f32) {
+        *self = f(*self, other);
     }
     fn avg(&self) -> f32 {
         *self
@@ -99,10 +100,9 @@ where
     fn map(self, f: impl Fn(f32) -> f32) -> Self {
         self.map(f)
     }
-    fn merge(mut self, other: Self, f: impl Fn(f32, f32) -> f32) -> Self {
+    fn merge(&mut self, other: Self, f: impl Fn(f32, f32) -> f32) {
         for (a, b) in self.iter_mut().zip(other) {
             *a = f(*a, b);
         }
-        self
     }
 }

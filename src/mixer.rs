@@ -65,7 +65,7 @@ where
         let mut frame = F::uniform(0.0);
         sources.retain_mut(|source| {
             if let Some(this_frame) = source.next(sample_rate) {
-                frame = frame.clone().merge(this_frame, |a, b| a + b);
+                frame.merge(this_frame, |a, b| a + b);
                 true
             } else {
                 false

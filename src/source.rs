@@ -84,7 +84,12 @@ pub trait Source {
     where
         Self: Sized,
     {
-        Chain { a: self, b: next }
+        Chain {
+            a: self,
+            b: next,
+            b_start: None,
+            time: 0.0,
+        }
     }
     /// Apply a low-pass filter with the given cut-off frequency
     fn low_pass<F>(self, freq: F) -> LowPass<Self, F>
@@ -143,7 +148,9 @@ pub trait Source {
         Repeat {
             source: self,
             count_left: Some(n),
-            curr: None,
+            curr: Vec::new(),
+            next_start: None,
+            time: 0.0,
         }
     }
     /// Repeat a source indefinitely
@@ -154,7 +161,9 @@ pub trait Source {
         Repeat {
             source: self,
             count_left: None,
-            curr: None,
+            curr: Vec::new(),
+            next_start: None,
+            time: 0.0,
         }
     }
     /// When repeated, make the source continue where it left off instead of starting over
@@ -308,6 +317,8 @@ where
 pub struct Chain<A, B> {
     a: A,
     b: B,
+    b_start: Option<f32>,
+    time: f32,
 }
 
 impl<A, B> Source for Chain<A, B>
@@ -317,9 +328,24 @@ where
 {
     type Frame = A::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
-        self.a
-            .next(sample_rate)
-            .or_else(|| self.b.next(sample_rate))
+        let frame = if let Some(a) = self.a.next(sample_rate) {
+            match self.b_start {
+                Some(b_start) if self.time >= b_start => {
+                    let b = self
+                        .b
+                        .next(sample_rate)
+                        .unwrap_or_else(|| Self::Frame::uniform(0.0));
+                    a.add(b)
+                }
+                _ => a,
+            }
+        } else if let Some(b) = self.b.next(sample_rate) {
+            b
+        } else {
+            return None;
+        };
+        self.time += 1.0 / sample_rate;
+        Some(frame)
     }
 }
 
@@ -338,6 +364,7 @@ impl<S, F> Source for LowPass<S, F>
 where
     S: Source,
     F: Automation,
+    S::Frame: std::fmt::Debug,
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
@@ -345,7 +372,7 @@ where
         let frame = self.source.next(sample_rate)?;
         Some(if let Some(acc) = &mut self.acc {
             let t = (freq / sample_rate).min(1.0);
-            *acc = acc.clone().merge(frame, |a, b| lerp(a, b, t));
+            acc.merge(frame, |a, b| lerp(a, b, t));
             acc.clone()
         } else {
             self.acc = Some(frame.clone());
@@ -445,11 +472,13 @@ where
 }
 
 /// Source returned from [`Source::repeat`]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Repeat<S> {
     source: S,
     count_left: Option<usize>,
-    curr: Option<S>,
+    curr: Vec<S>,
+    next_start: Option<f32>,
+    time: f32,
 }
 
 impl<S> Source for Repeat<S>
@@ -458,21 +487,45 @@ where
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
-        if let Some(curr) = &mut self.curr {
-            curr.next(sample_rate).or_else(|| {
-                self.curr = None;
-                self.next(sample_rate)
-            })
-        } else {
-            if let Some(count_left) = &mut self.count_left {
-                if *count_left == 0 {
-                    return None;
+        let count_left = &mut self.count_left;
+        let mut add_new = || match count_left {
+            Some(count_left) => {
+                if *count_left > 0 {
+                    *count_left -= 1;
+                    true
+                } else {
+                    false
                 }
-                *count_left -= 1;
             }
-            self.curr = Some(self.source.clone());
-            self.next(sample_rate)
+            None => true,
+        };
+        if let Some(next_start) = self.next_start {
+            if self.time >= next_start {
+                if add_new() {
+                    self.curr.push(self.source.clone());
+                    self.time = 0.0;
+                }
+            }
         }
+        if self.curr.is_empty() {
+            if add_new() {
+                self.curr.push(self.source.clone());
+                self.time = 0.0;
+            } else {
+                return None;
+            }
+        }
+        let mut frame = Self::Frame::uniform(0.0);
+        self.curr.retain_mut(|source| {
+            if let Some(next) = source.next(sample_rate) {
+                frame.merge(next, Frame::add);
+                true
+            } else {
+                false
+            }
+        });
+        self.time += 1.0 / sample_rate;
+        Some(frame)
     }
 }
 
