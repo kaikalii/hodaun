@@ -8,15 +8,15 @@ version = '0.1.0'
 cpal.optional = true
 cpal.version = '0.14.2'
 crossbeam-channel = '0.5.4'
+hound.optional = true
+hound.version = '3.5.0'
 rand.features = ['small_rng']
 rand.version = '0.8.5'
-rustfft.optional = true
-rustfft.version = '6'
 thiserror.optional = true
 thiserror.version = '1'
 
 [features]
-analyze = ['rustfft']
-default = ['analyze', 'input', 'output']
+default = ['input', 'output', 'wav']
 input = ['cpal', 'thiserror']
 output = ['cpal', 'thiserror']
+wav = ["hound"]

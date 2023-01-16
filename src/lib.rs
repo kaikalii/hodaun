@@ -10,6 +10,9 @@ pub mod gen;
 mod io;
 mod mixer;
 pub mod source;
+#[cfg(feature = "wav")]
+#[cfg_attr(docsrs, doc(cfg(feature = "wav")))]
+pub mod wav;
 
 #[cfg(any(feature = "input", feature = "output"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "input", feature = "output"))))]
