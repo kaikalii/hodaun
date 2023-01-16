@@ -4,6 +4,7 @@
 This crate provides interfaces for audio input and output, as well as mixing and signal processing.
 */
 
+mod frame;
 pub mod gen;
 #[cfg(any(feature = "input", feature = "output"))]
 mod io;
@@ -14,9 +15,7 @@ pub mod source;
 #[cfg_attr(docsrs, doc(cfg(any(feature = "input", feature = "output"))))]
 pub use io::*;
 #[doc(inline)]
-pub use source::{
-    mono, stereo, AdsEnvelope, Constant, Frame, Maintainer, Mono, Source, Stereo, UnrolledSource,
-};
+pub use source::{AdsEnvelope, Constant, Maintainer, Source, UnrolledSource};
 use std::{
     cmp::Ordering,
     fmt,
@@ -24,7 +23,7 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
-pub use {gen::*, mixer::*};
+pub use {frame::*, gen::*, mixer::*};
 
 trait Amplitude: Clone + std::ops::AddAssign<Self> {
     const MIDPOINT: Self;

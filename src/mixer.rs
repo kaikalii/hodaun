@@ -1,6 +1,6 @@
 use crossbeam_channel::{unbounded, Receiver, Sender};
 
-use crate::source::*;
+use crate::{source::*, Frame};
 
 pub(crate) struct MixedSource<F> {
     source: Box<dyn Source<Frame = F> + Send + 'static>,

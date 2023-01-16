@@ -4,7 +4,7 @@ use std::f32::consts::TAU;
 
 use rand::prelude::*;
 
-use crate::source::*;
+use crate::{source::*, Mono};
 
 /// Defines a waveform
 pub trait Waveform {
