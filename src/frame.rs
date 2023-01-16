@@ -41,6 +41,20 @@ pub trait Frame: Clone {
     fn add(self, other: Self) -> Self {
         self.merge(other, Add::add)
     }
+    /// Write the frame to a channel slice
+    ///
+    /// The channel counts of the frame and slice need not match.
+    fn write_slice(self, slice: &mut [f32]) {
+        match (Self::CHANNELS, slice.len()) {
+            (1, _) => slice.fill(self.get_channel(0)),
+            (_, 1) => slice[0] = self.avg(),
+            (a, b) => {
+                for i in 0..a.min(b) {
+                    slice[i] = self.get_channel(i);
+                }
+            }
+        }
+    }
 }
 
 impl Frame for f32 {

@@ -222,7 +222,21 @@ pub trait Source {
             time: 0.0,
         }
     }
+    /// Unroll the source so that its samples are flat
+    fn unroll(self, sample_rate: f32) -> Unroll<Self>
+    where
+        Self: Sized,
+    {
+        Unroll {
+            source: self,
+            curr: None,
+            i: 0,
+            sample_rate,
+        }
+    }
 }
+
+pub(crate) type DynamicSource<F> = Box<dyn Source<Frame = F> + Send + 'static>;
 
 /// A source that returns a constant value
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -757,5 +771,50 @@ where
             self.time += 1.0 / self.source.sample_rate();
         }
         self.frame.clone()
+    }
+}
+
+/// Source returned from [`Source::unroll`]
+pub struct Unroll<S: Source> {
+    source: S,
+    sample_rate: f32,
+    curr: Option<S::Frame>,
+    i: usize,
+}
+
+impl<S> Iterator for Unroll<S>
+where
+    S: Source,
+{
+    type Item = f32;
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(curr) = &self.curr {
+            if self.i < <S::Frame as Frame>::CHANNELS {
+                let amplitude = curr.get_channel(self.i);
+                self.i += 1;
+                Some(amplitude)
+            } else {
+                self.curr = None;
+                self.i = 0;
+                self.next()
+            }
+        } else if let Some(curr) = self.source.next(self.sample_rate) {
+            self.curr = Some(curr);
+            self.next()
+        } else {
+            None
+        }
+    }
+}
+
+impl<S> UnrolledSource for Unroll<S>
+where
+    S: Source,
+{
+    fn channels(&self) -> usize {
+        <S::Frame as Frame>::CHANNELS
+    }
+    fn sample_rate(&self) -> f32 {
+        self.sample_rate
     }
 }

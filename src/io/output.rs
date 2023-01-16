@@ -1,12 +1,13 @@
-use std::sync::{Arc, Mutex};
-
-use crate::cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
-    *,
+use crate::{
+    cpal::{
+        traits::{DeviceTrait, HostTrait, StreamTrait},
+        *,
+    },
+    Mixer, MixerSource,
 };
 
 use crate::{
-    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame, MixedSource,
+    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame,
     MixerInterface, Source,
 };
 
@@ -15,13 +16,11 @@ pub fn default_output_device() -> Option<Device> {
     default_host().default_output_device()
 }
 
-type OutputDeviceMixerSources<F> = Arc<Mutex<Vec<MixedSource<F>>>>;
-
 /// Mixes audio sources and outputs them to a device
 ///
 /// It can be created with either [`OutputDeviceMixer::with_default_device`] or [`DeviceIoBuilder::build_output`]
 pub struct OutputDeviceMixer<F> {
-    sources: OutputDeviceMixerSources<F>,
+    mixer: Mixer<F>,
     stream: Stream,
     sample_rate: u32,
 }
@@ -35,7 +34,7 @@ where
     where
         S: Source<Frame = F> + Send + 'static,
     {
-        self.sources.lock().unwrap().push(MixedSource::new(source));
+        self.mixer.add(source);
     }
 }
 
@@ -65,12 +64,12 @@ where
         let sample_format = config.sample_format();
         let config = StreamConfig::from(config);
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
-        let sources = OutputDeviceMixerSources::default();
+        let (mixer, mixer_source) = Mixer::new();
         macro_rules! output_stream {
             ($sample:ty) => {
                 device.build_output_stream(
                     &config,
-                    write_sources::<F, $sample>(&sources, &config),
+                    write_sources::<F, $sample>(mixer_source, &config),
                     err_fn,
                 )
             };
@@ -82,7 +81,7 @@ where
         }
         .unwrap();
         Ok(OutputDeviceMixer {
-            sources,
+            mixer,
             stream,
             sample_rate: config.sample_rate.0,
         })
@@ -96,55 +95,37 @@ where
     /// Play the mixer, blocking the thread until all sources have finished
     pub fn play_blocking(&mut self) -> Result<(), PlayStreamError> {
         self.play()?;
-        while self
-            .sources
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|source| !source.finished())
-        {}
+        while !self.mixer.sources.lock().unwrap().is_empty() {}
         Ok(())
     }
 }
 
 fn write_sources<F, A>(
-    sources: &OutputDeviceMixerSources<F>,
+    mut mixer_source: MixerSource<F>,
     config: &StreamConfig,
 ) -> impl FnMut(&mut [A], &OutputCallbackInfo)
 where
     F: Frame,
     A: Amplitude,
 {
-    let mut i = 0;
     let channels = config.channels as usize;
     let sample_rate = config.sample_rate.0 as f32;
-    let sources = Arc::clone(sources);
+    let mut frame_buffer = vec![0.0; channels];
+    let mut i = channels;
+    println!("channels: {} -> {}", F::CHANNELS, channels);
     move |buffer, _| {
         buffer.fill(A::MIDPOINT);
-        'sources_loop: for ms in &mut *sources.lock().unwrap() {
-            let mut b = 0;
-            loop {
-                let frame = if let Some(frame) = ms.frame(sample_rate) {
-                    frame
+        for out_sample in buffer {
+            if i >= channels {
+                i = 0;
+                if let Some(frame) = mixer_source.next(sample_rate) {
+                    frame.write_slice(&mut frame_buffer);
                 } else {
-                    continue 'sources_loop;
-                };
-                while i < channels as usize && b < buffer.len() {
-                    let c = i % F::CHANNELS;
-                    let a = frame.get_channel(c);
-                    buffer[b] += A::from_f32(a);
-                    i += 1;
-                    b += 1;
-                }
-                ms.advance(sample_rate);
-                if i == channels as usize {
-                    i = 0;
-                }
-                if b == buffer.len() {
-                    i = 0;
                     break;
                 }
             }
+            *out_sample = A::from_f32(frame_buffer[i]);
+            i += 1;
         }
     }
 }
