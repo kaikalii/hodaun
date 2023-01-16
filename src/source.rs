@@ -1,13 +1,11 @@
 //! Audio sources
 
 use std::{
-    collections::VecDeque,
     marker::PhantomData,
-    sync::{Arc, Weak},
-    time::Duration,
+    sync::{Arc, Mutex, Weak},
 };
 
-use crate::{lerp, Frame, Shared, Stereo, ToDuration};
+use crate::{lerp, Automation, Frame, Shared, Stereo, ToDuration};
 
 /// An audio source with a dynamic frame size
 ///
@@ -49,79 +47,51 @@ pub trait Source {
     /// Returning [`None`] indicates the source has no samples left
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame>;
     /// Amplify the source by some multiplier
-    fn amplify(self, amp: impl Into<Shared<f32>>) -> Amplify<Self>
+    fn amplify<A>(self, amp: A) -> Amplify<Self, A>
     where
         Self: Sized,
     {
-        Amplify {
-            source: self,
-            amp: amp.into(),
-        }
-    }
-    /// Normalize the amplitude of the source
-    ///
-    /// The source will be amplified based on the average amplitude of
-    /// of previous frames
-    fn normalize(
-        self,
-        target_amp: impl Into<Shared<f32>>,
-        running_average_dur: impl ToDuration,
-    ) -> Normalize<Self>
-    where
-        Self: Sized,
-    {
-        Normalize {
-            source: self,
-            target_amp: target_amp.into(),
-            amp_mul: 1.0,
-            running_avg_dur: running_average_dur.to_duration().as_secs_f32(),
-        }
+        Amplify { source: self, amp }
     }
     /// End the source after some duration
-    fn take(self, dur: impl ToDuration) -> Take<Self>
+    fn take(self, dur: impl ToDuration) -> Take<Self, f32>
     where
         Self: Sized,
     {
         Take {
             source: self,
-            duration: dur.to_duration(),
-            elapsed: Duration::ZERO,
-            release: Duration::ZERO,
+            duration: dur.to_duration().as_secs_f32(),
+            elapsed: 0.0,
+            release: 0.0,
         }
     }
     /// End the source after some duration and apply a release envelope
-    fn take_release(self, dur: impl ToDuration, release: impl ToDuration) -> Take<Self>
+    fn take_release<R>(self, dur: impl ToDuration, release: R) -> Take<Self, R>
     where
         Self: Sized,
     {
         Take {
             source: self,
-            duration: dur.to_duration(),
-            elapsed: Duration::ZERO,
-            release: release.to_duration(),
+            duration: dur.to_duration().as_secs_f32(),
+            elapsed: 0.0,
+            release,
         }
     }
     /// Chain the source with another
-    fn chain<B>(self, next: B) -> Chain<Self::Frame>
+    fn chain<B>(self, next: B) -> Chain<Self, B>
     where
-        Self: Sized + Send + 'static,
-        B: Sized + Send + 'static + Source<Frame = Self::Frame>,
+        Self: Sized,
     {
-        let mut chain = Chain {
-            queue: VecDeque::new(),
-        };
-        chain.queue.push_back(Box::new(self));
-        chain.queue.push_back(Box::new(next));
-        chain
+        Chain { a: self, b: next }
     }
     /// Apply a low-pass filter with the given cut-off frequency
-    fn low_pass(self, freq: impl Into<Shared<f32>>) -> LowPass<Self>
+    fn low_pass<F>(self, freq: F) -> LowPass<Self, F>
     where
         Self: Sized,
     {
         LowPass {
             source: self,
-            freq: freq.into(),
+            freq,
             acc: None,
         }
     }
@@ -147,38 +117,80 @@ pub trait Source {
     /// Apply a pan to the source
     ///
     /// Non-mono sources will be averaged before panning
-    fn pan(self, pan: impl Into<Shared<f32>>) -> Pan<Self>
+    fn pan<P>(self, pan: P) -> Pan<Self, P>
     where
         Self: Sized,
     {
-        Pan {
+        Pan { source: self, pan }
+    }
+    /// Map the source's amplitude's range from [-1, 1] to [0, 1]
+    ///
+    /// This is useful for sources that are used as automation, since
+    /// many values that can be automated are in the range [0, 1].
+    fn positive(self) -> Positive<Self>
+    where
+        Self: Sized,
+    {
+        Positive { source: self }
+    }
+    /// Repeat a source `n` times
+    fn repeat(self, n: usize) -> Repeat<Self>
+    where
+        Self: Sized,
+    {
+        Repeat {
             source: self,
-            pan: pan.into(),
+            count_left: Some(n),
+            curr: None,
+        }
+    }
+    /// Repeat a source indefinitely
+    fn repeat_indefinitely(self) -> Repeat<Self>
+    where
+        Self: Sized,
+    {
+        Repeat {
+            source: self,
+            count_left: None,
+            curr: None,
+        }
+    }
+    /// When repeated, make the source continue where it left off instead of starting over
+    ///
+    /// This is useful for automation sources that need to not reset when the thing they
+    /// are automating is repeated.
+    fn no_repeat(self) -> NoRepeat<Self>
+    where
+        Self: Sized,
+    {
+        NoRepeat {
+            source: Arc::new(Mutex::new(self)),
         }
     }
     /// Apply an attack-decay-sustain envelope to the source
     ///
     /// To apply a release as well, use [`Source::take_release`] or [`Source::maintained`] after this
-    fn ads(self, envelope: impl Into<Shared<AdsEnvelope>>) -> Ads<Self>
+    fn ads<A, D, S>(self, envelope: AdsEnvelope<A, D, S>) -> Ads<Self, A, D, S>
     where
         Self: Sized,
     {
         Ads {
             source: self,
-            curr: Duration::ZERO,
-            envelope: envelope.into(),
+            time: 0.0,
+            envelope,
         }
     }
     /// Keep playing this source as long as the given [`Maintainer`] is not dropped
-    fn maintained(self, maintainer: &Maintainer) -> Maintained<Self>
+    fn maintained<R>(self, maintainer: &Maintainer<R>) -> Maintained<Self, R>
     where
         Self: Sized,
+        R: Clone,
     {
         Maintained {
             source: self,
             arc: Arc::downgrade(&maintainer.arc),
             release_dur: maintainer.release_dur.clone(),
-            release_curr: Duration::ZERO,
+            release_curr: 0.0,
         }
     }
     /// Allow the current frame of the source to be inspected
@@ -194,9 +206,6 @@ pub trait Source {
     }
 }
 
-/// A dynamic source type
-pub type DynSource<F> = Box<dyn Source<Frame = F> + Send>;
-
 /// A source that returns a constant value
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Constant(pub f32);
@@ -209,58 +218,38 @@ impl Source for Constant {
 }
 
 /// Source returned from [`Source::amplify`]
-pub struct Amplify<S> {
+#[derive(Debug, Clone, Copy)]
+pub struct Amplify<S, A> {
     source: S,
-    amp: Shared<f32>,
+    amp: A,
 }
 
-impl<S> Source for Amplify<S>
+impl<S, A> Source for Amplify<S, A>
 where
     S: Source,
-{
-    type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
-        self.source
-            .next(sample_rate)
-            .map(|frame| frame.map(|a| a * self.amp.get()))
-    }
-}
-
-/// Source returned from [`Source::normalize`]
-pub struct Normalize<S> {
-    source: S,
-    target_amp: Shared<f32>,
-    amp_mul: f32,
-    running_avg_dur: f32,
-}
-
-impl<S> Source for Normalize<S>
-where
-    S: Source,
+    A: Automation,
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         let frame = self.source.next(sample_rate)?;
-        let t = 1.0 / (sample_rate * self.running_avg_dur);
-        let target = self.target_amp.get();
-        let amp = target / self.amp_mul;
-        let new_amp = (1.0 - t) * amp + t * frame.avg().abs();
-        self.amp_mul = target / new_amp;
-        Some(frame.map(|a| a * self.amp_mul))
+        let amp = self.amp.next_value(sample_rate)?;
+        Some(frame.map(|a| a * amp))
     }
 }
 
 /// Source returned from [`Source::take`]
-pub struct Take<S> {
+#[derive(Debug, Clone, Copy)]
+pub struct Take<S, R> {
     source: S,
-    duration: Duration,
-    elapsed: Duration,
-    release: Duration,
+    duration: f32,
+    elapsed: f32,
+    release: R,
 }
 
-impl<S> Source for Take<S>
+impl<S, R> Source for Take<S, R>
 where
     S: Source,
+    R: Automation,
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
@@ -268,77 +257,71 @@ where
             return None;
         }
         let frame = self.source.next(sample_rate)?;
-        let amp = if self.release.is_zero() {
+        let release = self.release.next_value(sample_rate)?;
+        let amp = if release == 0.0 {
             1.0
         } else {
-            let time_left = (self.duration - self.elapsed).as_secs_f32();
-            (time_left / self.release.as_secs_f32()).min(1.0)
+            let time_left = self.duration - self.elapsed;
+            (time_left / release).min(1.0)
         };
-        self.elapsed += Duration::from_secs_f32(1.0 / sample_rate);
+        self.elapsed += 1.0 / sample_rate;
         Some(frame.map(|a| a * amp))
     }
 }
 
 /// Source return from [`Source::chain`]
-pub struct Chain<F> {
-    queue: VecDeque<DynSource<F>>,
+#[derive(Debug, Clone, Copy)]
+pub struct Chain<A, B> {
+    a: A,
+    b: B,
 }
 
-impl<F> Source for Chain<F>
+impl<A, B> Source for Chain<A, B>
 where
-    F: Frame,
+    A: Source,
+    B: Source<Frame = A::Frame>,
 {
-    type Frame = F;
+    type Frame = A::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
-        let front = self.queue.front_mut()?;
-        if let Some(frame) = front.next(sample_rate) {
-            Some(frame)
-        } else {
-            self.queue.pop_front();
-            self.next(sample_rate)
-        }
-    }
-    fn chain<B>(mut self, next: B) -> Chain<Self::Frame>
-    where
-        Self: Sized + Send + 'static,
-        B: Sized + Send + 'static + Source<Frame = Self::Frame>,
-    {
-        self.queue.push_back(Box::new(next));
-        self
+        self.a
+            .next(sample_rate)
+            .or_else(|| self.b.next(sample_rate))
     }
 }
 
 /// Source returned from [`Source::low_pass`]
-pub struct LowPass<S>
+#[derive(Debug, Clone, Copy)]
+pub struct LowPass<S, F>
 where
     S: Source,
 {
     source: S,
     acc: Option<S::Frame>,
-    freq: Shared<f32>,
+    freq: F,
 }
 
-impl<S> Source for LowPass<S>
+impl<S, F> Source for LowPass<S, F>
 where
     S: Source,
+    F: Automation,
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
-        if let Some(frame) = self.source.next(sample_rate) {
-            Some(if let Some(acc) = &mut self.acc {
-                let t = (self.freq.get() / sample_rate).min(1.0);
-                acc.clone().merge(frame, |a, b| lerp(a, b, t))
-            } else {
-                self.acc = Some(frame.clone());
-                frame
-            })
+        let freq = self.freq.next_value(sample_rate)?;
+        let frame = self.source.next(sample_rate)?;
+        Some(if let Some(acc) = &mut self.acc {
+            let t = (freq / sample_rate).min(1.0);
+            *acc = acc.clone().merge(frame, |a, b| lerp(a, b, t));
+            acc.clone()
         } else {
-            None
-        }
+            self.acc = Some(frame.clone());
+            frame
+        })
     }
 }
 
 /// Source returned from [`Source::map`]
+#[derive(Debug, Clone, Copy)]
 pub struct Map<S, F> {
     source: S,
     f: F,
@@ -357,6 +340,7 @@ where
 }
 
 /// Source returned from [`Source::zip`]
+#[derive(Debug, Clone, Copy)]
 pub struct Zip<A, B, F>
 where
     A: Source,
@@ -384,20 +368,23 @@ where
 }
 
 /// Source returned from [`Source::pan`]
-pub struct Pan<S> {
+#[derive(Debug, Clone, Copy)]
+pub struct Pan<S, P> {
     source: S,
-    pan: Shared<f32>,
+    pan: P,
 }
 
-impl<S> Source for Pan<S>
+impl<S, P> Source for Pan<S, P>
 where
     S: Source,
+    P: Automation,
 {
     type Frame = Stereo;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let pan = self.pan.next_value(sample_rate)?;
+        let pan = (pan + 1.0) / 2.0;
         self.source.next(sample_rate).map(|frame| {
             let frame = frame.avg();
-            let pan = self.pan.get();
             let left = frame * (1.0 - pan);
             let right = frame * pan;
             [left, right]
@@ -405,115 +392,195 @@ where
     }
 }
 
-/// Used to coordinate the dropping of [`Source`]s
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Maintainer {
-    arc: Arc<()>,
-    release_dur: Shared<Duration>,
+/// Source returned from [`Source::positive`]
+#[derive(Debug, Clone, Copy)]
+pub struct Positive<S> {
+    source: S,
 }
 
-impl Maintainer {
+impl<S> Source for Positive<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        self.source
+            .next(sample_rate)
+            .map(|frame| frame.map(|a| (a + 1.0) / 2.0))
+    }
+}
+
+/// Source returned from [`Source::repeat`]
+#[derive(Debug, Clone, Copy)]
+pub struct Repeat<S> {
+    source: S,
+    count_left: Option<usize>,
+    curr: Option<S>,
+}
+
+impl<S> Source for Repeat<S>
+where
+    S: Source + Clone,
+{
+    type Frame = S::Frame;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        if let Some(curr) = &mut self.curr {
+            curr.next(sample_rate).or_else(|| {
+                self.curr = None;
+                self.next(sample_rate)
+            })
+        } else {
+            if let Some(count_left) = &mut self.count_left {
+                if *count_left == 0 {
+                    return None;
+                }
+                *count_left -= 1;
+            }
+            self.curr = Some(self.source.clone());
+            self.next(sample_rate)
+        }
+    }
+}
+
+/// Source returned from [`Source::no_repeat`]
+#[derive(Debug, Clone)]
+pub struct NoRepeat<S> {
+    source: Arc<Mutex<S>>,
+}
+
+impl<S> Source for NoRepeat<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let mut source = self.source.lock().unwrap();
+        source.next(sample_rate)
+    }
+}
+
+/// Used to coordinate the dropping of [`Source`]s
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Maintainer<R> {
+    arc: Arc<()>,
+    release_dur: R,
+}
+
+impl<R> Maintainer<R>
+where
+    R: Default,
+{
     /// Create a new maintainer
     pub fn new() -> Self {
         Self::default()
     }
-    /// Create a new maintainer with the given release duration
-    pub fn with_release(dur: impl Into<Shared<Duration>>) -> Self {
-        Maintainer {
-            arc: Arc::new(()),
-            release_dur: dur.into(),
-        }
-    }
 }
 
-impl Drop for Maintainer {
-    fn drop(&mut self) {}
+impl<R> Maintainer<R> {
+    /// Create a new maintainer with the given release duration
+    pub fn with_release(release_dur: R) -> Self {
+        Maintainer {
+            arc: Arc::new(()),
+            release_dur,
+        }
+    }
 }
 
 /// An attack-decay-sustain evenlope
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AdsEnvelope {
+pub struct AdsEnvelope<A = f32, D = f32, S = f32> {
     /// The time after the sound starts before it is at its maximum volume
-    pub attack: Duration,
+    pub attack: A,
     /// The time between the maximum amplitude and the sustain amplitude
-    pub decay: Duration,
+    pub decay: D,
     /// The sustain amplitude
-    pub sustain: f32,
+    pub sustain: S,
 }
 
-impl Default for AdsEnvelope {
+impl<A, D, S> Default for AdsEnvelope<A, D, S>
+where
+    A: From<f32>,
+    D: From<f32>,
+    S: From<f32>,
+{
     fn default() -> Self {
         AdsEnvelope {
-            attack: Duration::ZERO,
-            decay: Duration::ZERO,
-            sustain: 1.0,
+            attack: 0.0.into(),
+            decay: 0.0.into(),
+            sustain: 1.0.into(),
         }
     }
 }
 
-impl AdsEnvelope {
+impl<A, D, S> AdsEnvelope<A, D, S> {
     /// Create a new ADS envelope
-    pub fn new(attack: impl ToDuration, decay: impl ToDuration, sustain: f32) -> Self {
+    pub fn new(attack: A, decay: D, sustain: S) -> Self {
         Self {
-            attack: attack.to_duration(),
-            decay: decay.to_duration(),
+            attack,
+            decay,
             sustain,
         }
     }
 }
 
 /// Source returned from [`Source::ads`]
-pub struct Ads<S> {
-    source: S,
-    curr: Duration,
-    envelope: Shared<AdsEnvelope>,
+#[derive(Debug, Clone, Copy)]
+pub struct Ads<Src, A, D, S> {
+    source: Src,
+    time: f32,
+    envelope: AdsEnvelope<A, D, S>,
 }
 
-impl<S> Source for Ads<S>
+impl<Src, A, D, S> Source for Ads<Src, A, D, S>
 where
-    S: Source,
+    Src: Source,
+    A: Automation,
+    D: Automation,
+    S: Automation,
 {
-    type Frame = S::Frame;
+    type Frame = Src::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         let frame = self.source.next(sample_rate)?;
-        let envelope = self.envelope.get();
-        let amp = if self.curr < envelope.attack {
-            self.curr.as_secs_f32() / envelope.attack.as_secs_f32()
+        let attack = self.envelope.attack.next_value(sample_rate)?;
+        let decay = self.envelope.decay.next_value(sample_rate)?;
+        let sustain = self.envelope.sustain.next_value(sample_rate)?;
+        let amp = if self.time < attack {
+            self.time / attack
         } else {
-            let after_attack = self.curr - envelope.attack;
-            if after_attack < envelope.decay {
-                (1.0 - after_attack.as_secs_f32() / envelope.decay.as_secs_f32())
-                    * (1.0 - envelope.sustain)
-                    + envelope.sustain
+            let after_attack = self.time - attack;
+            if after_attack < decay {
+                (1.0 - after_attack / decay) * (1.0 - sustain) + sustain
             } else {
-                envelope.sustain
+                sustain
             }
         };
-        self.curr += Duration::from_secs_f32(1.0 / sample_rate);
+        self.time += 1.0 / sample_rate;
         Some(frame.map(|s| s * amp))
     }
 }
 
 /// Source returned from [`Source::maintained`]
-pub struct Maintained<S> {
+#[derive(Debug, Clone)]
+pub struct Maintained<S, R> {
     source: S,
     arc: Weak<()>,
-    release_dur: Shared<Duration>,
-    release_curr: Duration,
+    release_dur: R,
+    release_curr: f32,
 }
 
-impl<S> Source for Maintained<S>
+impl<S, R> Source for Maintained<S, R>
 where
     S: Source,
+    R: Automation,
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let release_dur = self.release_dur.next_value(sample_rate)?;
         if Weak::strong_count(&self.arc) == 0 {
-            let release_dur = self.release_dur.get();
             if self.release_curr < release_dur {
-                let amp = 1.0 - self.release_curr.as_secs_f32() / release_dur.as_secs_f32();
+                let amp = 1.0 - self.release_curr / release_dur;
                 let frame = self.source.next(sample_rate)?.map(|s| s * amp);
-                self.release_curr += Duration::from_secs_f32(1.0 / sample_rate);
+                self.release_curr += 1.0 / sample_rate;
                 Some(frame)
             } else {
                 None
@@ -525,12 +592,14 @@ where
 }
 
 /// A source that is being inspected by a [`SourceInspector`]
+#[derive(Debug, Clone)]
 pub struct InspectedSource<S: Source> {
     source: S,
     curr: Shared<Option<S::Frame>>,
 }
 
 /// Allows the inspection of a [`Source`]'s current frame
+#[derive(Debug, Clone)]
 pub struct SourceInspector<F> {
     curr: Shared<Option<F>>,
 }
@@ -555,6 +624,7 @@ where
 }
 
 /// Source that resamples a dynamic source to have a fixed frame size
+#[derive(Debug, Clone, Copy)]
 pub struct Resample<S, F> {
     source: S,
     time: f32,

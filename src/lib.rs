@@ -64,31 +64,57 @@ pub trait ToDuration {
     fn to_duration(self) -> Duration;
 }
 
-/// Interprets a number as seconds
-impl ToDuration for f32 {
+impl ToDuration for Duration {
     fn to_duration(self) -> Duration {
-        Duration::from_secs_f32(self)
+        self
     }
 }
 
-/// Interprets a number as seconds
-impl ToDuration for f64 {
-    fn to_duration(self) -> Duration {
-        Duration::from_secs_f64(self)
-    }
-}
-
-/// Interprets a number as seconds
 impl ToDuration for u64 {
     fn to_duration(self) -> Duration {
         Duration::from_secs(self)
     }
 }
 
-/// Interprets a number as seconds
-impl ToDuration for Duration {
+impl ToDuration for f32 {
     fn to_duration(self) -> Duration {
-        self
+        Duration::from_secs_f32(self)
+    }
+}
+
+/// Trait for automating source control value
+pub trait Automation {
+    /// Get the next value
+    fn next_value(&mut self, sample_rate: f32) -> Option<f32>;
+}
+
+impl Automation for f32 {
+    #[inline(always)]
+    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
+        Some(*self)
+    }
+}
+
+impl Automation for u64 {
+    #[inline(always)]
+    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
+        Some(*self as f32)
+    }
+}
+
+impl Automation for Shared<f32> {
+    #[inline(always)]
+    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
+        Some(self.get())
+    }
+}
+
+impl<S> Automation for S
+where
+    S: Source<Frame = f32>,
+{
+    fn next_value(&mut self, sample_rate: f32) -> Option<f32> {
+        Source::next(self, sample_rate)
     }
 }
 

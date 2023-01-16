@@ -4,7 +4,7 @@ use std::f32::consts::TAU;
 
 use rand::prelude::*;
 
-use crate::{source::*, Mono};
+use crate::{source::*, Automation, Mono};
 
 /// Defines a waveform
 pub trait Waveform {
@@ -18,15 +18,15 @@ pub trait Waveform {
 
 /// A [`Source`] implementation that outputs a simple wave
 #[derive(Debug, Clone, Copy)]
-pub struct Wave<W> {
+pub struct Wave<W, F = f32> {
     waveform: W,
-    freq: f32,
+    freq: F,
     time: f32,
 }
 
-impl<W> Wave<W> {
-    /// Create a new wave with the given waveform, frequency, and sample rate
-    pub fn with(waveform: W, freq: f32) -> Self {
+impl<W, F> Wave<W, F> {
+    /// Create a new wave with the given waveform and frequency
+    pub fn with(waveform: W, freq: F) -> Self {
         Wave {
             waveform,
             freq,
@@ -35,12 +35,12 @@ impl<W> Wave<W> {
     }
 }
 
-impl<W> Wave<W>
+impl<W, F> Wave<W, F>
 where
     W: Default,
 {
-    /// Create a new wave with the given frequency and sample rate
-    pub fn new(freq: f32) -> Self {
+    /// Create a new wave with the given frequency
+    pub fn new(freq: F) -> Self {
         Wave {
             waveform: W::default(),
             freq,
@@ -49,14 +49,16 @@ where
     }
 }
 
-impl<W> Source for Wave<W>
+impl<W, F> Source for Wave<W, F>
 where
     W: Waveform,
+    F: Automation,
 {
     type Frame = Mono;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         let res = 1.0 / W::LOUDNESS * self.waveform.one_hz(self.time);
-        self.time += self.freq / sample_rate;
+        let freq = self.freq.next_value(sample_rate)?;
+        self.time += freq / sample_rate;
         Some(res)
     }
 }
@@ -106,13 +108,13 @@ impl Waveform for Triangle {
 }
 
 /// A sine wave source
-pub type SineWave = Wave<Sine>;
+pub type SineWave<F = f32> = Wave<Sine, F>;
 /// A square wave source
-pub type SquareWave = Wave<Square>;
+pub type SquareWave<F = f32> = Wave<Square, F>;
 /// A saw wave source
-pub type SawWave = Wave<Saw>;
+pub type SawWave<F = f32> = Wave<Saw, F>;
 /// A triangle wave source
-pub type TriangleWave = Wave<Triangle>;
+pub type TriangleWave<F = f32> = Wave<Triangle, F>;
 
 /// Simple random noise source
 #[derive(Debug, Clone)]
@@ -133,5 +135,47 @@ impl Source for Noise {
     type Frame = Mono;
     fn next(&mut self, _sample_rate: f32) -> Option<Self::Frame> {
         Some(self.rng.gen_range(-1.0..=1.0) as f32)
+    }
+}
+
+#[derive(Clone, Copy)]
+/// A linear interpolation source
+pub struct Lerp<A, B, D> {
+    start: A,
+    end: B,
+    duration: D,
+    time: f32,
+}
+
+impl<A, B, D> Lerp<A, B, D> {
+    /// Create a new linear interpolation from `start` to `end` over `duration`
+    pub fn new(start: A, end: B, duration: D) -> Self {
+        Lerp {
+            start,
+            end,
+            duration,
+            time: 0.0,
+        }
+    }
+}
+
+impl<A, B, D> Source for Lerp<A, B, D>
+where
+    A: Automation,
+    B: Automation,
+    D: Automation,
+{
+    type Frame = Mono;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let duration = self.duration.next_value(sample_rate)?;
+        if self.time >= duration {
+            return None;
+        }
+        let t = self.time / duration;
+        let a = self.start.next_value(sample_rate)?;
+        let b = self.end.next_value(sample_rate)?;
+        let res = a * (1.0 - t) + b * t;
+        self.time += 1.0 / sample_rate;
+        Some(res)
     }
 }
