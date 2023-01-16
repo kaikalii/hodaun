@@ -124,7 +124,7 @@ where
         'sources_loop: for ms in &mut *sources.lock().unwrap() {
             let mut b = 0;
             loop {
-                let frame = if let Some(frame) = ms.frame() {
+                let frame = if let Some(frame) = ms.frame(sample_rate) {
                     frame
                 } else {
                     continue 'sources_loop;

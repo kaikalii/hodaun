@@ -110,10 +110,10 @@ where
 ///
 /// It can be converted to a [`Source`] by with [`UnrolledSource::resample`].
 pub trait UnrolledSource: Iterator<Item = f32> {
-    /// Get the sample rate
-    fn sample_rate(&self) -> f32;
     /// Get the number of audio channels
     fn channels(&self) -> usize;
+    /// Get the sample rate
+    fn sample_rate(&self) -> f32;
     /// Resample this source to have a static frame size
     ///
     /// For a frame size of 1, the source samples are averaged.
@@ -127,6 +127,8 @@ pub trait UnrolledSource: Iterator<Item = f32> {
     {
         Resample {
             source: self,
+            time: 0.0,
+            frame: None,
             pd: PhantomData,
         }
     }
@@ -136,12 +138,10 @@ pub trait UnrolledSource: Iterator<Item = f32> {
 pub trait Source {
     /// The [`Frame`] type
     type Frame: Frame;
-    /// Get the sample rate
-    fn sample_rate(&self) -> f32;
     /// Get the next frame
     ///
     /// Returning [`None`] indicates the source has no samples left
-    fn next(&mut self) -> Option<Self::Frame>;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame>;
     /// Amplify the source by some multiplier
     fn amplify(self, amp: impl Into<Shared<f32>>) -> Amplify<Self>
     where
@@ -201,9 +201,7 @@ pub trait Source {
         Self: Sized + Send + 'static,
         B: Sized + Send + 'static + Source<Frame = Self::Frame>,
     {
-        let initial_sample_rate = self.sample_rate();
         let mut chain = Chain {
-            initial_sample_rate,
             queue: VecDeque::new(),
         };
         chain.queue.push_back(Box::new(self));
@@ -236,11 +234,8 @@ pub trait Source {
     {
         Zip {
             a: self,
-            curr_a: None,
             b: other,
-            curr_b: None,
             f,
-            t: 0.0,
         }
     }
     /// Apply a pan to the source
@@ -296,62 +291,14 @@ pub trait Source {
 /// A dynamic source type
 pub type DynSource<F> = Box<dyn Source<Frame = F> + Send>;
 
-/// Source that plays nothing forever
-#[derive(Debug, Clone, Copy)]
-pub struct Silence<F = f32> {
-    sample_rate: f32,
-    pd: PhantomData<F>,
-}
+/// A source that returns a constant value
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct Constant(pub f32);
 
-impl<F> Silence<F> {
-    /// Create new silence
-    pub fn new(sample_rate: f32) -> Self {
-        Silence {
-            sample_rate,
-            pd: PhantomData,
-        }
-    }
-}
-
-impl<F> Source for Silence<F>
-where
-    F: Frame,
-{
-    type Frame = F;
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        Some(F::uniform(0.0))
-    }
-}
-
-/// Source that constantly plays the max amplitude on every channel
-pub struct Steady<F> {
-    sample_rate: f32,
-    pd: PhantomData<F>,
-}
-
-impl<F> Steady<F> {
-    /// Create new steady
-    pub fn new(sample_rate: f32) -> Self {
-        Steady {
-            sample_rate,
-            pd: PhantomData,
-        }
-    }
-}
-
-impl<F> Source for Steady<F>
-where
-    F: Frame,
-{
-    type Frame = F;
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        Some(F::uniform(1.0))
+impl Source for Constant {
+    type Frame = f32;
+    fn next(&mut self, _sample_rate: f32) -> Option<Self::Frame> {
+        Some(self.0)
     }
 }
 
@@ -366,12 +313,9 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         self.source
-            .next()
+            .next(sample_rate)
             .map(|frame| frame.map(|a| a * self.amp.get()))
     }
 }
@@ -389,12 +333,9 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        let frame = self.source.next()?;
-        let t = 1.0 / (self.source.sample_rate() * self.running_avg_dur);
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let frame = self.source.next(sample_rate)?;
+        let t = 1.0 / (sample_rate * self.running_avg_dur);
         let target = self.target_amp.get();
         let amp = target / self.amp_mul;
         let new_amp = (1.0 - t) * amp + t * frame.avg().abs();
@@ -416,28 +357,24 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         if self.elapsed >= self.duration {
             return None;
         }
-        let frame = self.source.next()?;
+        let frame = self.source.next(sample_rate)?;
         let amp = if self.release.is_zero() {
             1.0
         } else {
             let time_left = (self.duration - self.elapsed).as_secs_f32();
             (time_left / self.release.as_secs_f32()).min(1.0)
         };
-        self.elapsed += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+        self.elapsed += Duration::from_secs_f32(1.0 / sample_rate);
         Some(frame.map(|a| a * amp))
     }
 }
 
 /// Source return from [`Source::chain`]
 pub struct Chain<F> {
-    initial_sample_rate: f32,
     queue: VecDeque<DynSource<F>>,
 }
 
@@ -446,19 +383,13 @@ where
     F: Frame,
 {
     type Frame = F;
-    fn sample_rate(&self) -> f32 {
-        self.queue
-            .front()
-            .map(|source| source.sample_rate())
-            .unwrap_or(self.initial_sample_rate)
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         let front = self.queue.front_mut()?;
-        if let Some(frame) = front.next() {
+        if let Some(frame) = front.next(sample_rate) {
             Some(frame)
         } else {
             self.queue.pop_front();
-            self.next()
+            self.next(sample_rate)
         }
     }
     fn chain<B>(mut self, next: B) -> Chain<Self::Frame>
@@ -486,13 +417,10 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        if let Some(frame) = self.source.next() {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        if let Some(frame) = self.source.next(sample_rate) {
             Some(if let Some(acc) = &mut self.acc {
-                let t = (self.freq.get() / self.source.sample_rate()).min(1.0);
+                let t = (self.freq.get() / sample_rate).min(1.0);
                 acc.clone().merge(frame, |a, b| lerp(a, b, t))
             } else {
                 self.acc = Some(frame.clone());
@@ -517,11 +445,8 @@ where
     B: Frame,
 {
     type Frame = B;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        self.source.next().map(&self.f)
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        self.source.next(sample_rate).map(&self.f)
     }
 }
 
@@ -532,11 +457,8 @@ where
     B: Source,
 {
     a: A,
-    curr_a: Option<A::Frame>,
     b: B,
-    curr_b: Option<B::Frame>,
     f: F,
-    t: f32,
 }
 
 impl<A, B, F, C> Source for Zip<A, B, F>
@@ -547,27 +469,11 @@ where
     C: Frame,
 {
     type Frame = C;
-    fn sample_rate(&self) -> f32 {
-        self.a.sample_rate().max(self.b.sample_rate())
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        let a = if self.t >= 0.0 {
-            let frame = self.a.next()?;
-            self.curr_a = Some(frame.clone());
-            self.t -= 1.0 / self.a.sample_rate();
-            frame
-        } else {
-            self.curr_a.clone()?
-        };
-        let b = if self.t < 0.0 {
-            let frame = self.b.next()?;
-            self.curr_b = Some(frame.clone());
-            self.t += 1.0 / self.b.sample_rate();
-            frame
-        } else {
-            self.curr_b.clone()?
-        };
-        Some((self.f)(a, b))
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        Some((self.f)(
+            self.a.next(sample_rate)?,
+            self.b.next(sample_rate)?,
+        ))
     }
 }
 
@@ -582,11 +488,8 @@ where
     S: Source,
 {
     type Frame = Stereo;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        self.source.next().map(|frame| {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        self.source.next(sample_rate).map(|frame| {
             let frame = frame.avg();
             let pan = self.pan.get();
             let left = frame * (1.0 - pan);
@@ -665,11 +568,8 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        let frame = self.source.next()?;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let frame = self.source.next(sample_rate)?;
         let envelope = self.envelope.get();
         let amp = if self.curr < envelope.attack {
             self.curr.as_secs_f32() / envelope.attack.as_secs_f32()
@@ -683,7 +583,7 @@ where
                 envelope.sustain
             }
         };
-        self.curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+        self.curr += Duration::from_secs_f32(1.0 / sample_rate);
         Some(frame.map(|s| s * amp))
     }
 }
@@ -701,22 +601,19 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         if Weak::strong_count(&self.arc) == 0 {
             let release_dur = self.release_dur.get();
             if self.release_curr < release_dur {
                 let amp = 1.0 - self.release_curr.as_secs_f32() / release_dur.as_secs_f32();
-                let frame = self.source.next()?.map(|s| s * amp);
-                self.release_curr += Duration::from_secs_f32(1.0 / self.source.sample_rate());
+                let frame = self.source.next(sample_rate)?.map(|s| s * amp);
+                self.release_curr += Duration::from_secs_f32(1.0 / sample_rate);
                 Some(frame)
             } else {
                 None
             }
         } else {
-            self.source.next()
+            self.source.next(sample_rate)
         }
     }
 }
@@ -734,11 +631,8 @@ pub struct SourceInspector<F> {
 
 impl<S: Source> Source for InspectedSource<S> {
     type Frame = S::Frame;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        let frame = self.source.next();
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let frame = self.source.next(sample_rate);
         self.curr.set(frame.clone());
         frame
     }
@@ -757,19 +651,17 @@ where
 /// Source that resamples a dynamic source to have a fixed frame size
 pub struct Resample<S, F> {
     source: S,
+    time: f32,
+    frame: Option<F>,
     pd: PhantomData<F>,
 }
 
-impl<S, F> Source for Resample<S, F>
+impl<S, F> Resample<S, F>
 where
     S: UnrolledSource,
     F: Frame,
 {
-    type Frame = F;
-    fn sample_rate(&self) -> f32 {
-        self.source.sample_rate()
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn get_frame(&mut self) -> Option<F> {
         let source_channels = self.source.channels();
         let mut sample = F::uniform(0.0);
         match F::CHANNELS {
@@ -814,5 +706,21 @@ where
             }
         }
         Some(sample)
+    }
+}
+
+impl<S, F> Source for Resample<S, F>
+where
+    S: UnrolledSource,
+    F: Frame,
+{
+    type Frame = F;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let target_time = self.time + 1.0 / sample_rate;
+        while self.time < target_time {
+            self.frame = self.get_frame();
+            self.time += 1.0 / self.source.sample_rate();
+        }
+        self.frame.clone()
     }
 }

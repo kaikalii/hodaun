@@ -36,11 +36,11 @@ impl Iterator for InputDeviceSource {
 }
 
 impl UnrolledSource for InputDeviceSource {
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate as f32
-    }
     fn channels(&self) -> usize {
         self.channels as usize
+    }
+    fn sample_rate(&self) -> f32 {
+        self.sample_rate as f32
     }
 }
 

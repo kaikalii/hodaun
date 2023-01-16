@@ -24,10 +24,10 @@ where
             finished: false,
         }
     }
-    pub fn frame(&mut self) -> Option<F> {
+    pub fn frame(&mut self, sample_rate: f32) -> Option<F> {
         if self.t <= 0.0 {
-            if let Some(frame) = self.source.next() {
-                self.t += 1.0 / self.source.sample_rate();
+            if let Some(frame) = self.source.next(sample_rate) {
+                self.t += 1.0 / sample_rate;
                 self.curr = Some(frame.clone());
                 Some(frame)
             } else {
@@ -103,14 +103,7 @@ where
     F: Frame,
 {
     type Frame = F;
-    fn sample_rate(&self) -> f32 {
-        self.sources
-            .iter()
-            .map(|ms| ms.source.sample_rate())
-            .min_by(|a, b| a.partial_cmp(b).expect("source has NaN sample rate"))
-            .unwrap_or(1.0)
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         self.sources
             .extend(self.recv.try_iter().map(|source| MixedSource {
                 source,
@@ -119,9 +112,8 @@ where
                 finished: false,
             }));
         let mut frame = F::uniform(0.0);
-        let sample_rate = self.sample_rate();
         for ms in &mut self.sources {
-            if let Some(this_frame) = ms.frame() {
+            if let Some(this_frame) = ms.frame(sample_rate) {
                 frame = frame.merge(this_frame, |a, b| a + b);
             }
             ms.advance(sample_rate);

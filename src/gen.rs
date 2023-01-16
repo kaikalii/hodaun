@@ -21,17 +21,15 @@ pub trait Waveform {
 pub struct Wave<W> {
     waveform: W,
     freq: f32,
-    sample_rate: f32,
     time: f32,
 }
 
 impl<W> Wave<W> {
     /// Create a new wave with the given waveform, frequency, and sample rate
-    pub fn with(waveform: W, freq: f32, sample_rate: f32) -> Self {
+    pub fn with(waveform: W, freq: f32) -> Self {
         Wave {
             waveform,
             freq,
-            sample_rate,
             time: 0.0,
         }
     }
@@ -42,11 +40,10 @@ where
     W: Default,
 {
     /// Create a new wave with the given frequency and sample rate
-    pub fn new(freq: f32, sample_rate: f32) -> Self {
+    pub fn new(freq: f32) -> Self {
         Wave {
             waveform: W::default(),
             freq,
-            sample_rate,
             time: 0.0,
         }
     }
@@ -57,12 +54,9 @@ where
     W: Waveform,
 {
     type Frame = Mono;
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         let res = 1.0 / W::LOUDNESS * self.waveform.one_hz(self.time);
-        self.time += self.freq / self.sample_rate;
+        self.time += self.freq / sample_rate;
         Some(res)
     }
 }
@@ -124,25 +118,20 @@ pub type TriangleWave = Wave<Triangle>;
 #[derive(Debug, Clone)]
 pub struct Noise {
     rng: SmallRng,
-    sample_rate: f32,
 }
 
 impl Noise {
     /// Create new noise with the given sample rate
-    pub fn new(sample_rate: f32) -> Self {
+    pub fn new() -> Self {
         Noise {
             rng: SmallRng::from_entropy(),
-            sample_rate,
         }
     }
 }
 
 impl Source for Noise {
     type Frame = Mono;
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
+    fn next(&mut self, _sample_rate: f32) -> Option<Self::Frame> {
         Some(self.rng.gen_range(-1.0..=1.0) as f32)
     }
 }

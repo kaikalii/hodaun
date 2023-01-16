@@ -15,7 +15,7 @@ pub mod source;
 pub use io::*;
 #[doc(inline)]
 pub use source::{
-    mono, stereo, AdsEnvelope, Frame, Maintainer, Mono, Silence, Source, Stereo, UnrolledSource,
+    mono, stereo, AdsEnvelope, Constant, Frame, Maintainer, Mono, Source, Stereo, UnrolledSource,
 };
 use std::{
     cmp::Ordering,
