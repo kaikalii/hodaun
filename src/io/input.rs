@@ -1,8 +1,8 @@
 use std::sync::mpsc;
 
-use cpal::{
+use crate::cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
-    InputCallbackInfo, Sample, SampleFormat, Stream, StreamConfig,
+    *,
 };
 
 use crate::{
@@ -10,8 +10,8 @@ use crate::{
 };
 
 /// Get the default input device
-pub fn default_input_device() -> Option<cpal::Device> {
-    cpal::default_host().default_input_device()
+pub fn default_input_device() -> Option<Device> {
+    default_host().default_input_device()
 }
 
 /// An [`UnrolledSource`] that receives audio samples from the system audio input

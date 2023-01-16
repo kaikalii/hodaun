@@ -6,7 +6,7 @@ version = '0.1.0'
 
 [dependencies]
 cpal.optional = true
-cpal.version = '0.13.5'
+cpal.version = '0.14.2'
 crossbeam-channel = '0.5.4'
 rand.features = ['small_rng']
 rand.version = '0.8.5'

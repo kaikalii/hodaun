@@ -3,10 +3,7 @@ mod input;
 #[cfg(feature = "output")]
 mod output;
 
-use self::cpal::{
-    traits::DeviceTrait, BuildStreamError, DefaultStreamConfigError, Device, PlayStreamError,
-    SupportedStreamConfig, SupportedStreamConfigsError,
-};
+use self::cpal::{traits::DeviceTrait, *};
 #[cfg(feature = "output")]
 use crate::Frame;
 #[cfg(feature = "input")]

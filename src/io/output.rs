@@ -1,6 +1,9 @@
 use std::sync::{Arc, Mutex};
 
-use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use crate::cpal::{
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+    *,
+};
 
 use crate::{
     Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame, MixedSource,
@@ -8,8 +11,8 @@ use crate::{
 };
 
 /// Get the default output device
-pub fn default_output_device() -> Option<cpal::Device> {
-    cpal::default_host().default_output_device()
+pub fn default_output_device() -> Option<Device> {
+    default_host().default_output_device()
 }
 
 type OutputDeviceMixerSources<F> = Arc<Mutex<Vec<MixedSource<F>>>>;
@@ -19,7 +22,7 @@ type OutputDeviceMixerSources<F> = Arc<Mutex<Vec<MixedSource<F>>>>;
 /// It can be created with either [`OutputDeviceMixer::with_default_device`] or [`DeviceIoBuilder::build_output`]
 pub struct OutputDeviceMixer<F> {
     sources: OutputDeviceMixerSources<F>,
-    stream: cpal::Stream,
+    stream: Stream,
     sample_rate: u32,
 }
 
@@ -60,7 +63,7 @@ where
             device.default_output_config()?
         };
         let sample_format = config.sample_format();
-        let config = cpal::StreamConfig::from(config);
+        let config = StreamConfig::from(config);
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
         let sources = OutputDeviceMixerSources::default();
         macro_rules! output_stream {
@@ -73,9 +76,9 @@ where
             };
         }
         let stream = match sample_format {
-            cpal::SampleFormat::F32 => output_stream!(f32),
-            cpal::SampleFormat::I16 => output_stream!(i16),
-            cpal::SampleFormat::U16 => output_stream!(u16),
+            SampleFormat::F32 => output_stream!(f32),
+            SampleFormat::I16 => output_stream!(i16),
+            SampleFormat::U16 => output_stream!(u16),
         }
         .unwrap();
         Ok(OutputDeviceMixer {
@@ -87,11 +90,11 @@ where
     /// Start the mixer playing without blocking the thread
     ///
     /// Playback will stop if the mixer is dropped
-    pub fn play(&mut self) -> Result<(), cpal::PlayStreamError> {
+    pub fn play(&mut self) -> Result<(), PlayStreamError> {
         self.stream.play()
     }
     /// Play the mixer, blocking the thread until all sources have finished
-    pub fn play_blocking(&mut self) -> Result<(), cpal::PlayStreamError> {
+    pub fn play_blocking(&mut self) -> Result<(), PlayStreamError> {
         self.play()?;
         while self
             .sources
@@ -106,8 +109,8 @@ where
 
 fn write_sources<F, A>(
     sources: &OutputDeviceMixerSources<F>,
-    config: &cpal::StreamConfig,
-) -> impl FnMut(&mut [A], &cpal::OutputCallbackInfo)
+    config: &StreamConfig,
+) -> impl FnMut(&mut [A], &OutputCallbackInfo)
 where
     F: Frame,
     A: Amplitude,
