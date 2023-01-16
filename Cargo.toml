@@ -11,12 +11,14 @@ hound.optional = true
 hound.version = '3.5.0'
 parking_lot = '0.12.1'
 rand.features = ['small_rng']
+rand.optional = true
 rand.version = '0.8.5'
 thiserror.optional = true
 thiserror.version = '1'
 
 [features]
-default = ['input', 'output', 'wav']
+default = ['input', 'noise', 'output', 'wav']
 input = ['cpal', 'thiserror']
+noise = ['rand']
 output = ['cpal', 'thiserror']
 wav = ['hound']

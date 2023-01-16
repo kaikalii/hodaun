@@ -2,6 +2,7 @@
 
 use std::f32::consts::TAU;
 
+#[cfg(feature = "rand")]
 use rand::prelude::*;
 
 use crate::{source::*, Automation, Mono};
@@ -117,11 +118,13 @@ pub type SawWave<F = f32> = Wave<Saw, F>;
 pub type TriangleWave<F = f32> = Wave<Triangle, F>;
 
 /// Simple random noise source
+#[cfg(feature = "noise")]
 #[derive(Debug, Clone)]
 pub struct Noise {
     rng: SmallRng,
 }
 
+#[cfg(feature = "noise")]
 impl Noise {
     /// Create new noise with the given sample rate
     pub fn new() -> Self {
@@ -131,6 +134,7 @@ impl Noise {
     }
 }
 
+#[cfg(feature = "noise")]
 impl Source for Noise {
     type Frame = Mono;
     fn next(&mut self, _sample_rate: f32) -> Option<Self::Frame> {
