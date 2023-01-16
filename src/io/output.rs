@@ -1,3 +1,5 @@
+use std::{thread, time::Duration};
+
 use crate::{
     cpal::{
         traits::{DeviceTrait, HostTrait, StreamTrait},
@@ -95,7 +97,14 @@ where
     /// Play the mixer, blocking the thread until all sources have finished
     pub fn play_blocking(&mut self) -> Result<(), PlayStreamError> {
         self.play()?;
-        while !self.mixer.sources.lock().is_empty() {}
+        while self
+            .mixer
+            .sources
+            .try_lock()
+            .map_or(true, |sources| !sources.is_empty())
+        {
+            thread::sleep(Duration::from_millis(1));
+        }
         Ok(())
     }
 }
