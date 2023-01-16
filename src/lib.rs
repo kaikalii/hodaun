@@ -23,10 +23,12 @@ use std::{
     cmp::Ordering,
     fmt,
     hash::{Hash, Hasher},
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::Duration,
 };
 pub use {frame::*, gen::*, mixer::*};
+
+use parking_lot::Mutex;
 
 trait Amplitude: Clone + std::ops::AddAssign<Self> {
     const MIDPOINT: Self;
@@ -135,7 +137,7 @@ impl<T> Shared<T> {
     }
     /// Set the value
     pub fn set(&self, val: T) {
-        *self.0.lock().unwrap() = val;
+        *self.0.lock() = val;
     }
 }
 
@@ -145,7 +147,7 @@ where
 {
     /// Copy the value out
     pub fn get(&self) -> T {
-        *self.0.lock().unwrap()
+        *self.0.lock()
     }
 }
 
@@ -155,7 +157,7 @@ where
 {
     /// Clone the value out
     pub fn cloned(&self) -> T {
-        self.0.lock().unwrap().clone()
+        self.0.lock().clone()
     }
 }
 
@@ -164,7 +166,7 @@ where
     T: PartialEq,
 {
     fn eq(&self, other: &Self) -> bool {
-        *self.0.lock().unwrap() == *other.0.lock().unwrap()
+        *self.0.lock() == *other.0.lock()
     }
 }
 
@@ -181,10 +183,7 @@ where
     T: PartialOrd,
 {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.0
-            .lock()
-            .unwrap()
-            .partial_cmp(&*other.0.lock().unwrap())
+        self.0.lock().partial_cmp(&*other.0.lock())
     }
 }
 
@@ -193,7 +192,7 @@ where
     T: Ord,
 {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0.lock().unwrap().cmp(&*other.0.lock().unwrap())
+        self.0.lock().cmp(&*other.0.lock())
     }
 }
 
@@ -202,7 +201,7 @@ where
     T: Hash,
 {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.lock().unwrap().hash(state);
+        self.0.lock().hash(state);
     }
 }
 
@@ -211,7 +210,7 @@ where
     T: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.lock().unwrap().fmt(f)
+        self.0.lock().fmt(f)
     }
 }
 
@@ -220,7 +219,7 @@ where
     T: fmt::Display,
 {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.0.lock().unwrap().fmt(f)
+        self.0.lock().fmt(f)
     }
 }
 

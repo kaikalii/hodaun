@@ -1,4 +1,6 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use crate::{source::*, Frame};
 
@@ -36,7 +38,7 @@ where
     where
         S: Source<Frame = Self::Frame> + Send + 'static,
     {
-        self.sources.lock().unwrap().push(Box::new(source));
+        self.sources.lock().push(Box::new(source));
     }
 }
 
@@ -59,7 +61,7 @@ where
 {
     type Frame = F;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
-        let mut sources = self.sources.lock().unwrap();
+        let mut sources = self.sources.lock();
         let mut frame = F::uniform(0.0);
         sources.retain_mut(|source| {
             if let Some(this_frame) = source.next(sample_rate) {

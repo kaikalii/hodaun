@@ -2,8 +2,10 @@
 
 use std::{
     marker::PhantomData,
-    sync::{Arc, Mutex, Weak},
+    sync::{Arc, Weak},
 };
+
+use parking_lot::Mutex;
 
 use crate::{lerp, Automation, Frame, Shared, Stereo, ToDuration};
 
@@ -486,8 +488,7 @@ where
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
-        let mut source = self.source.lock().unwrap();
-        source.next(sample_rate)
+        self.source.lock().next(sample_rate)
     }
 }
 
@@ -674,7 +675,7 @@ where
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         let index = (self.time * sample_rate) as usize;
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         while index >= inner.buffer.len() {
             let frame = inner.source.next(sample_rate)?;
             inner.buffer.push(frame);
