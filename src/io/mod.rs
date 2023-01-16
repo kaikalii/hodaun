@@ -16,7 +16,7 @@ pub use output::*;
 
 pub use cpal;
 
-/// A error encountered when trying to build a [`SystemAudio`]
+/// A error encountered when trying to build audio I/O sources
 #[derive(Debug, thiserror::Error)]
 pub enum BuildSystemAudioError {
     /// An error building the audio stream
@@ -36,7 +36,7 @@ pub enum BuildSystemAudioError {
     NoDevice,
 }
 
-/// A result type for trying to build a [`SystemAudio`]
+/// A result type for trying to build audio I/O sources
 pub type BuildSystemAudioResult<T> = Result<T, BuildSystemAudioError>;
 
 /**

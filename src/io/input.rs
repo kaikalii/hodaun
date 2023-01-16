@@ -14,7 +14,7 @@ pub fn default_input_device() -> Option<cpal::Device> {
     cpal::default_host().default_input_device()
 }
 
-/// A [`SignalSource`] that receives audio samples from the system audio input
+/// An [`UnrolledSource`] that receives audio samples from the system audio input
 pub struct InputDeviceSource {
     _stream: Stream,
     recv: mpsc::Receiver<f32>,

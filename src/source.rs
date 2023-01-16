@@ -84,6 +84,8 @@ where
 ///
 /// This is usually only used for audio sources whose channel count
 /// is only known at runtime, like audio input.
+///
+/// It can be converted to a [`Source`] by with [`UnrolledSource::resample`].
 pub trait UnrolledSource: Iterator<Item = f32> {
     /// Get the sample rate
     fn sample_rate(&self) -> f32;
@@ -152,7 +154,20 @@ pub trait Source {
         Take {
             source: self,
             duration: dur,
-            elapsed: Duration::from_secs(0),
+            elapsed: Duration::ZERO,
+            release: Duration::ZERO,
+        }
+    }
+    /// End the source after some duration and apply a release envelope
+    fn take_release(self, dur: Duration, release: Duration) -> Take<Self>
+    where
+        Self: Sized,
+    {
+        Take {
+            source: self,
+            duration: dur,
+            elapsed: Duration::ZERO,
+            release,
         }
     }
     /// Chain the source with another
@@ -205,6 +220,8 @@ pub trait Source {
         }
     }
     /// Apply an attack-decay-sustain envelope to the source
+    ///
+    /// To apply a release as well, use [`Source::take_release`] after this
     fn ads<E>(self, envelope: E) -> Ads<Self>
     where
         Self: Sized,
@@ -265,7 +282,7 @@ where
     }
 }
 
-/// Source returned from [`Source::normalized`]
+/// Source returned from [`Source::normalize`]
 pub struct Normalize<S> {
     source: S,
     target_amp: Shared<f32>,
@@ -327,6 +344,7 @@ pub struct Take<S> {
     source: S,
     duration: Duration,
     elapsed: Duration,
+    release: Duration,
 }
 
 impl<S> Source for Take<S>
@@ -342,8 +360,14 @@ where
             return None;
         }
         let frame = self.source.next()?;
+        let amp = if self.release.is_zero() {
+            let time_left = (self.duration - self.elapsed).as_secs_f32();
+            (time_left / self.release.as_secs_f32()).min(1.0)
+        } else {
+            1.0
+        };
         self.elapsed += Duration::from_secs_f32(1.0 / self.source.sample_rate());
-        Some(frame)
+        Some(frame.map(|a| a * amp))
     }
 }
 
@@ -509,10 +533,10 @@ impl Drop for Maintainer {
     fn drop(&mut self) {}
 }
 
-/// An attack-decary-sustain evenlope
+/// An attack-decay-sustain evenlope
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AdsEnvelope {
-    /// The after the sound starts before it is at its maximum volume
+    /// The time after the sound starts before it is at its maximum volume
     pub attack: Duration,
     /// The time between the maximum amplitude and the sustain amplitude
     pub decay: Duration,

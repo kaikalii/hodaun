@@ -1,7 +1,7 @@
 #![warn(missing_docs)]
 
 /*!
-A crate to simplify audio output
+This crate provides interfaces for audio input and output, as well as mixing and signal processing.
 */
 
 pub mod gen;

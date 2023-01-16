@@ -3,7 +3,7 @@ use std::time::Duration;
 use hodaun::{gen::SineWave, MixerInterface, Mono, OutputDeviceMixer, Source};
 
 fn main() {
-    // Initializer the output
+    // Initialize the output
     let mut output = OutputDeviceMixer::<Mono>::with_default_device().unwrap();
     let sample_rate = output.sample_rate();
 
