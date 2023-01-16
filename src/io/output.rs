@@ -121,7 +121,6 @@ where
     let sample_rate = config.sample_rate.0 as f32;
     let mut frame_buffer = vec![0.0; channels];
     let mut i = channels;
-    println!("channels: {} -> {}", F::CHANNELS, channels);
     move |buffer, _| {
         buffer.fill(A::MIDPOINT);
         for out_sample in buffer {

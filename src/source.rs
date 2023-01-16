@@ -141,7 +141,7 @@ pub trait Source {
         Positive { source: self }
     }
     /// Repeat a source `n` times
-    fn repeat(self, n: usize) -> Repeat<Self>
+    fn repeat(self, n: usize) -> Repeat<Self, f32>
     where
         Self: Sized,
     {
@@ -149,12 +149,13 @@ pub trait Source {
             source: self,
             count_left: Some(n),
             curr: Vec::new(),
-            next_start: None,
+            period: None,
             time: 0.0,
+            started: false,
         }
     }
     /// Repeat a source indefinitely
-    fn repeat_indefinitely(self) -> Repeat<Self>
+    fn repeat_indefinitely(self) -> Repeat<Self, f32>
     where
         Self: Sized,
     {
@@ -162,8 +163,9 @@ pub trait Source {
             source: self,
             count_left: None,
             curr: Vec::new(),
-            next_start: None,
+            period: None,
             time: 0.0,
+            started: false,
         }
     }
     /// When repeated, make the source continue where it left off instead of starting over
@@ -473,17 +475,37 @@ where
 
 /// Source returned from [`Source::repeat`]
 #[derive(Debug, Clone)]
-pub struct Repeat<S> {
+pub struct Repeat<S, P> {
     source: S,
     count_left: Option<usize>,
     curr: Vec<S>,
-    next_start: Option<f32>,
+    period: Option<P>,
     time: f32,
+    started: bool,
 }
 
-impl<S> Source for Repeat<S>
+impl<S, P> Repeat<S, P> {
+    /// Repeat every `period` seconds
+    pub fn every<Q>(self, period: Q) -> Repeat<S, Q>
+    where
+        Self: Sized,
+        Q: Automation,
+    {
+        Repeat {
+            source: self.source,
+            count_left: self.count_left,
+            curr: self.curr,
+            period: Some(period),
+            time: self.time,
+            started: self.started,
+        }
+    }
+}
+
+impl<S, P> Source for Repeat<S, P>
 where
     S: Source + Clone,
+    P: Automation,
 {
     type Frame = S::Frame;
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
@@ -499,15 +521,18 @@ where
             }
             None => true,
         };
-        if let Some(next_start) = self.next_start {
-            if self.time >= next_start {
+        if let Some(period) = &mut self.period {
+            let period = period.next_value(sample_rate)?;
+            if self.time >= period {
                 if add_new() {
                     self.curr.push(self.source.clone());
                     self.time = 0.0;
+                } else {
+                    return None;
                 }
             }
         }
-        if self.curr.is_empty() {
+        if self.curr.is_empty() && (self.period.is_none() || !self.started) {
             if add_new() {
                 self.curr.push(self.source.clone());
                 self.time = 0.0;
@@ -525,6 +550,7 @@ where
             }
         });
         self.time += 1.0 / sample_rate;
+        self.started = true;
         Some(frame)
     }
 }
