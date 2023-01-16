@@ -26,9 +26,11 @@ pub fn stereo(frame: Mono) -> Stereo {
 }
 
 /// A single multi-channel frame in an audio source
-pub trait Frame: Default + Clone {
+pub trait Frame: Clone {
     /// The number of audio channels
     const CHANNELS: usize;
+    /// Create a frame with a uniform amplitude across all channels
+    fn uniform(amplitude: f32) -> Self;
     /// Get the amplitude of a channel
     fn get_channel(&self, index: usize) -> f32;
     /// Set the amplitude of a channel
@@ -53,6 +55,9 @@ pub trait Frame: Default + Clone {
 
 impl Frame for f32 {
     const CHANNELS: usize = 1;
+    fn uniform(amplitude: f32) -> Self {
+        amplitude
+    }
     fn get_channel(&self, _index: usize) -> f32 {
         *self
     }
@@ -78,6 +83,9 @@ where
     Self: Default,
 {
     const CHANNELS: usize = N;
+    fn uniform(amplitude: f32) -> Self {
+        [amplitude; N]
+    }
     fn get_channel(&self, index: usize) -> f32 {
         self[index]
     }
@@ -288,6 +296,65 @@ pub trait Source {
 /// A dynamic source type
 pub type DynSource<F> = Box<dyn Source<Frame = F> + Send>;
 
+/// Source that plays nothing forever
+#[derive(Debug, Clone, Copy)]
+pub struct Silence<F = f32> {
+    sample_rate: f32,
+    pd: PhantomData<F>,
+}
+
+impl<F> Silence<F> {
+    /// Create new silence
+    pub fn new(sample_rate: f32) -> Self {
+        Silence {
+            sample_rate,
+            pd: PhantomData,
+        }
+    }
+}
+
+impl<F> Source for Silence<F>
+where
+    F: Frame,
+{
+    type Frame = F;
+    fn sample_rate(&self) -> f32 {
+        self.sample_rate
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        Some(F::uniform(0.0))
+    }
+}
+
+/// Source that constantly plays the max amplitude on every channel
+pub struct Steady<F> {
+    sample_rate: f32,
+    pd: PhantomData<F>,
+}
+
+impl<F> Steady<F> {
+    /// Create new steady
+    pub fn new(sample_rate: f32) -> Self {
+        Steady {
+            sample_rate,
+            pd: PhantomData,
+        }
+    }
+}
+
+impl<F> Source for Steady<F>
+where
+    F: Frame,
+{
+    type Frame = F;
+    fn sample_rate(&self) -> f32 {
+        self.sample_rate
+    }
+    fn next(&mut self) -> Option<Self::Frame> {
+        Some(F::uniform(1.0))
+    }
+}
+
 /// Source returned from [`Source::amplify`]
 pub struct Amplify<S> {
     source: S,
@@ -333,36 +400,6 @@ where
         let new_amp = (1.0 - t) * amp + t * frame.avg().abs();
         self.amp_mul = target / new_amp;
         Some(frame.map(|a| a * self.amp_mul))
-    }
-}
-
-/// Source that plays nothing forever
-#[derive(Debug, Clone, Copy)]
-pub struct Silence<F = f32> {
-    sample_rate: f32,
-    pd: PhantomData<F>,
-}
-
-impl<F> Silence<F> {
-    /// Create new silence
-    pub fn new(sample_rate: f32) -> Self {
-        Silence {
-            sample_rate,
-            pd: PhantomData,
-        }
-    }
-}
-
-impl<F> Source for Silence<F>
-where
-    F: Frame,
-{
-    type Frame = F;
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate
-    }
-    fn next(&mut self) -> Option<Self::Frame> {
-        Some(F::default())
     }
 }
 
@@ -734,7 +771,7 @@ where
     }
     fn next(&mut self) -> Option<Self::Frame> {
         let source_channels = self.source.channels();
-        let mut sample = F::default();
+        let mut sample = F::uniform(0.0);
         match F::CHANNELS {
             // For empty output just take all the source samples
             0 => {

@@ -118,7 +118,7 @@ where
                 curr: None,
                 finished: false,
             }));
-        let mut frame = F::default();
+        let mut frame = F::uniform(0.0);
         let sample_rate = self.sample_rate();
         for ms in &mut self.sources {
             if let Some(this_frame) = ms.frame() {
