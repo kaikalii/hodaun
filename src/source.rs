@@ -41,7 +41,7 @@ pub trait Frame: Default + Clone {
     where
         F: Fn(f32) -> f32;
     /// Combine two frames by applying a function
-    fn merge<F>(&mut self, other: Self, f: F)
+    fn merge<F>(self, other: Self, f: F) -> Self
     where
         F: Fn(f32, f32) -> f32;
     /// Get the average amplitude
@@ -53,9 +53,8 @@ pub trait Frame: Default + Clone {
             / channels as f32
     }
     /// Add two frames
-    fn add(mut self, other: Self) -> Self {
-        self.merge(other, Add::add);
-        self
+    fn add(self, other: Self) -> Self {
+        self.merge(other, Add::add)
     }
 }
 
@@ -73,11 +72,17 @@ impl Frame for f32 {
     {
         f(self)
     }
-    fn merge<F>(&mut self, other: Self, f: F)
+    fn merge<F>(self, other: Self, f: F) -> Self
     where
         F: Fn(f32, f32) -> f32,
     {
-        *self = f(*self, other);
+        f(self, other)
+    }
+    fn avg(&self) -> f32 {
+        *self
+    }
+    fn add(self, other: Self) -> Self {
+        self + other
     }
 }
 
@@ -98,13 +103,14 @@ where
     {
         self.map(f)
     }
-    fn merge<F>(&mut self, other: Self, f: F)
+    fn merge<F>(mut self, other: Self, f: F) -> Self
     where
         F: Fn(f32, f32) -> f32,
     {
         for (a, b) in self.iter_mut().zip(other) {
             *a = f(*a, b);
         }
+        self
     }
 }
 
@@ -351,7 +357,7 @@ where
 
 /// Source that plays nothing forever
 #[derive(Debug, Clone, Copy)]
-pub struct Silence<F = [f32; 1]> {
+pub struct Silence<F = f32> {
     sample_rate: f32,
     pd: PhantomData<F>,
 }
@@ -469,8 +475,7 @@ where
         if let Some(frame) = self.source.next() {
             Some(if let Some(acc) = &mut self.acc {
                 let t = (self.freq.get() / self.source.sample_rate()).min(1.0);
-                acc.merge(frame, |a, b| lerp(a, b, t));
-                acc.clone()
+                acc.clone().merge(frame, |a, b| lerp(a, b, t))
             } else {
                 self.acc = Some(frame.clone());
                 frame
