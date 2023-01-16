@@ -204,6 +204,24 @@ pub trait Source {
             InspectedSource { source: self, curr },
         )
     }
+    /// Buffer the source
+    ///
+    /// The source returned by this function can be cloned, and while each clone will
+    /// track its time seperately, the underlying source will only be read once.
+    ///
+    /// Useful when reading from sound files or with other sources that cannot be cloned.
+    fn buffer(self) -> Buffered<Self>
+    where
+        Self: Sized,
+    {
+        Buffered {
+            inner: Arc::new(Mutex::new(BufferedInner {
+                source: self,
+                buffer: Vec::new(),
+            })),
+            time: 0.0,
+        }
+    }
 }
 
 /// A source that returns a constant value
@@ -620,6 +638,47 @@ where
     /// Read the inspected [`Source`]'s current frame
     pub fn read(&self) -> Option<F> {
         self.curr.cloned()
+    }
+}
+
+/// Source returned from [`Source::buffered`]
+pub struct Buffered<S: Source> {
+    inner: Arc<Mutex<BufferedInner<S>>>,
+    time: f32,
+}
+
+/// Source returned from [`Source::buffered`]
+struct BufferedInner<S: Source> {
+    source: S,
+    buffer: Vec<S::Frame>,
+}
+
+impl<S> Source for Buffered<S>
+where
+    S: Source,
+{
+    type Frame = S::Frame;
+    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+        let index = (self.time * sample_rate) as usize;
+        let mut inner = self.inner.lock().unwrap();
+        while index >= inner.buffer.len() {
+            let frame = inner.source.next(sample_rate)?;
+            inner.buffer.push(frame);
+        }
+        self.time += 1.0 / sample_rate;
+        Some(inner.buffer[index].clone())
+    }
+}
+
+impl<S> Clone for Buffered<S>
+where
+    S: Source,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            time: self.time,
+        }
     }
 }
 
