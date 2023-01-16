@@ -16,10 +16,7 @@ pub type Mono = f32;
 pub type Stereo = [f32; 2];
 
 /// Convert a [`Frame`] to mono
-pub fn mono<F>(frame: F) -> Mono
-where
-    F: AsRef<[f32]>,
-{
+pub fn mono(frame: impl AsRef<[f32]>) -> Mono {
     frame.as_ref().iter().sum::<f32>() / frame.as_ref().len() as f32
 }
 
@@ -37,13 +34,9 @@ pub trait Frame: Default + Clone {
     /// Set the amplitude of a channel
     fn set_channel(&mut self, index: usize, amplitude: f32);
     /// Apply a function to each channels
-    fn map<F>(self, f: F) -> Self
-    where
-        F: Fn(f32) -> f32;
+    fn map(self, f: impl Fn(f32) -> f32) -> Self;
     /// Combine two frames by applying a function
-    fn merge<F>(self, other: Self, f: F) -> Self
-    where
-        F: Fn(f32, f32) -> f32;
+    fn merge(self, other: Self, f: impl Fn(f32, f32) -> f32) -> Self;
     /// Get the average amplitude
     fn avg(&self) -> f32 {
         let channels = Self::CHANNELS;
@@ -66,16 +59,10 @@ impl Frame for f32 {
     fn set_channel(&mut self, _index: usize, amplitude: f32) {
         *self = amplitude;
     }
-    fn map<F>(self, f: F) -> Self
-    where
-        F: Fn(f32) -> f32,
-    {
+    fn map(self, f: impl Fn(f32) -> f32) -> Self {
         f(self)
     }
-    fn merge<F>(self, other: Self, f: F) -> Self
-    where
-        F: Fn(f32, f32) -> f32,
-    {
+    fn merge(self, other: Self, f: impl Fn(f32, f32) -> f32) -> Self {
         f(self, other)
     }
     fn avg(&self) -> f32 {
@@ -97,16 +84,10 @@ where
     fn set_channel(&mut self, index: usize, amplitude: f32) {
         self[index] = amplitude;
     }
-    fn map<F>(self, f: F) -> Self
-    where
-        F: Fn(f32) -> f32,
-    {
+    fn map(self, f: impl Fn(f32) -> f32) -> Self {
         self.map(f)
     }
-    fn merge<F>(mut self, other: Self, f: F) -> Self
-    where
-        F: Fn(f32, f32) -> f32,
-    {
+    fn merge(mut self, other: Self, f: impl Fn(f32, f32) -> f32) -> Self {
         for (a, b) in self.iter_mut().zip(other) {
             *a = f(*a, b);
         }
@@ -154,10 +135,9 @@ pub trait Source {
     /// Returning [`None`] indicates the source has no samples left
     fn next(&mut self) -> Option<Self::Frame>;
     /// Amplify the source by some multiplier
-    fn amplify<A>(self, amp: A) -> Amplify<Self>
+    fn amplify(self, amp: impl Into<Shared<f32>>) -> Amplify<Self>
     where
         Self: Sized,
-        A: Into<Shared<f32>>,
     {
         Amplify {
             source: self,
@@ -168,10 +148,13 @@ pub trait Source {
     ///
     /// The source will be amplified based on the average amplitude of
     /// of previous frames
-    fn normalize<A>(self, target_amp: A, running_average_dur: impl ToDuration) -> Normalize<Self>
+    fn normalize(
+        self,
+        target_amp: impl Into<Shared<f32>>,
+        running_average_dur: impl ToDuration,
+    ) -> Normalize<Self>
     where
         Self: Sized,
-        A: Into<Shared<f32>>,
     {
         Normalize {
             source: self,
@@ -220,10 +203,9 @@ pub trait Source {
         chain
     }
     /// Apply a low-pass filter with the given cut-off frequency
-    fn low_pass<F>(self, freq: F) -> LowPass<Self>
+    fn low_pass(self, freq: impl Into<Shared<f32>>) -> LowPass<Self>
     where
         Self: Sized,
-        F: Into<Shared<f32>>,
     {
         LowPass {
             source: self,
@@ -268,10 +250,9 @@ pub trait Source {
     /// Apply an attack-decay-sustain envelope to the source
     ///
     /// To apply a release as well, use [`Source::take_release`] or [`Source::maintained`] after this
-    fn ads<E>(self, envelope: E) -> Ads<Self>
+    fn ads(self, envelope: impl Into<Shared<AdsEnvelope>>) -> Ads<Self>
     where
         Self: Sized,
-        E: Into<Shared<AdsEnvelope>>,
     {
         Ads {
             source: self,
