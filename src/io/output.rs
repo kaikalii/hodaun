@@ -15,6 +15,8 @@ pub fn default_output_device() -> Option<cpal::Device> {
 type OutputDeviceMixerSources<F> = Arc<Mutex<Vec<MixedSource<F>>>>;
 
 /// Mixes audio sources and outputs them to a device
+///
+/// It can be created with either [`OutputDeviceMixer::with_default_device`] or [`DeviceIoBuilder::build_output`]
 pub struct OutputDeviceMixer<F> {
     sources: OutputDeviceMixerSources<F>,
     stream: cpal::Stream,

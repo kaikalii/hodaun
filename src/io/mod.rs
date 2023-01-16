@@ -3,18 +3,21 @@ mod input;
 #[cfg(feature = "output")]
 mod output;
 
-#[cfg(feature = "output")]
-use crate::Frame;
-use cpal::{
+use self::cpal::{
     traits::DeviceTrait, BuildStreamError, DefaultStreamConfigError, Device, PlayStreamError,
     SupportedStreamConfig, SupportedStreamConfigsError,
 };
+#[cfg(feature = "output")]
+use crate::Frame;
 #[cfg(feature = "input")]
 pub use input::*;
 #[cfg(feature = "output")]
 pub use output::*;
 
-pub use cpal;
+/// Re-export of the [`cpal`](https://docs.rs/cpal) crate
+pub mod cpal {
+    pub use ::cpal::*;
+}
 
 /// A error encountered when trying to build audio I/O sources
 #[derive(Debug, thiserror::Error)]

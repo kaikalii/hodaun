@@ -15,6 +15,10 @@ pub fn default_input_device() -> Option<cpal::Device> {
 }
 
 /// An [`UnrolledSource`] that receives audio samples from the system audio input
+///
+/// It can be created with either [`InputDeviceSource::with_default_device`] or [`DeviceIoBuilder::build_input`]
+///
+/// It can be turned into a source with [`UnrolledSource::resample`]
 pub struct InputDeviceSource {
     _stream: Stream,
     recv: mpsc::Receiver<f32>,
