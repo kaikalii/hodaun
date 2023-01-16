@@ -5,7 +5,6 @@ This crate provides interfaces for audio input and output, as well as mixing and
 */
 
 pub mod gen;
-
 #[cfg(any(feature = "input", feature = "output"))]
 mod io;
 mod mixer;
@@ -14,15 +13,18 @@ pub mod source;
 #[cfg(any(feature = "input", feature = "output"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "input", feature = "output"))))]
 pub use io::*;
-pub use mixer::*;
 #[doc(inline)]
-pub use source::{mono, stereo, Frame, Maintainer, Mono, Silence, Source, Stereo};
+pub use source::{
+    mono, stereo, AdsEnvelope, Frame, Maintainer, Mono, Silence, Source, Stereo, UnrolledSource,
+};
 use std::{
     cmp::Ordering,
     fmt,
     hash::{Hash, Hasher},
     sync::{Arc, Mutex},
+    time::Duration,
 };
+pub use {gen::*, mixer::*};
 
 trait Amplitude: Clone + std::ops::AddAssign<Self> {
     const MIDPOINT: Self;
@@ -52,24 +54,43 @@ impl Amplitude for i16 {
     }
 }
 
-#[test]
-fn test() {
-    use std::{thread::sleep, time::Duration};
-    let mut mixer = OutputDeviceMixer::with_default_device().unwrap();
-    mixer.add(gen::SineWave::new(220.0, 32000.0).zip(
-        gen::Noise::new(32000.0),
-        // gen::SineWave::new(277.18, 44100.0),
-        // Silence::new(32000.0),
-        |[a]: Mono, [b]: Mono| [a, b],
-    ));
-    // mixer.add(gen::SquareWave::new(440.0, 32000.0));
-    mixer.play().unwrap();
-    sleep(Duration::from_secs(1));
-}
-
 /// Linearly interpolate two numbers
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     (1.0 - t) * a + t * b
+}
+
+/// A trait for converting to a [`Duration`]
+pub trait ToDuration {
+    /// Convert to a duration
+    fn to_duration(self) -> Duration;
+}
+
+/// Interprets a number as seconds
+impl ToDuration for f32 {
+    fn to_duration(self) -> Duration {
+        Duration::from_secs_f32(self)
+    }
+}
+
+/// Interprets a number as seconds
+impl ToDuration for f64 {
+    fn to_duration(self) -> Duration {
+        Duration::from_secs_f64(self)
+    }
+}
+
+/// Interprets a number as seconds
+impl ToDuration for u64 {
+    fn to_duration(self) -> Duration {
+        Duration::from_secs(self)
+    }
+}
+
+/// Interprets a number as seconds
+impl ToDuration for Duration {
+    fn to_duration(self) -> Duration {
+        self
+    }
 }
 
 /// A thread-safe, reference-counted, locked wrapper

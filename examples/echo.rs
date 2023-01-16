@@ -1,4 +1,4 @@
-use hodaun::{source::UnrolledSource, *};
+use hodaun::*;
 
 fn main() {
     let input = InputDeviceSource::with_default_device().unwrap();

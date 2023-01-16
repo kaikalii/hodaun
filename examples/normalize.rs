@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use hodaun::{gen::SineWave, MixerInterface, Mono, OutputDeviceMixer, Source};
+use hodaun::*;
 
 fn main() {
     // Initialize the output
@@ -8,7 +6,7 @@ fn main() {
     let sample_rate = output.sample_rate();
 
     const FREQ: f32 = 261.63;
-    const DUR: Duration = Duration::from_secs(2);
+    const DUR: u64 = 2;
 
     // Add waves
     // Even though all these sources are given different amplitudes,
@@ -17,12 +15,7 @@ fn main() {
     let b = SineWave::new(FREQ, sample_rate).amplify(0.1).take(DUR);
     let c = SineWave::new(FREQ, sample_rate).amplify(0.9).take(DUR);
     let d = SineWave::new(FREQ, sample_rate).amplify(0.3).take(DUR);
-    output.add(
-        a.chain(b)
-            .chain(c)
-            .chain(d)
-            .normalize(0.5, Duration::from_millis(5)),
-    );
+    output.add(a.chain(b).chain(c).chain(d).normalize(0.5, 0.005));
 
     // Play
     output.play_blocking().unwrap();

@@ -7,7 +7,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{lerp, Shared};
+use crate::{lerp, Shared, ToDuration};
 
 /// Mono [`Frame`] type
 pub type Mono = [f32; 1];
@@ -134,7 +134,7 @@ pub trait Source {
     ///
     /// The source will be amplified based on the average amplitude of
     /// of previous frames
-    fn normalize<A>(self, target_amp: A, running_average_dur: Duration) -> Normalize<Self>
+    fn normalize<A>(self, target_amp: A, running_average_dur: impl ToDuration) -> Normalize<Self>
     where
         Self: Sized,
         A: Into<Shared<f32>>,
@@ -143,31 +143,31 @@ pub trait Source {
             source: self,
             target_amp: target_amp.into(),
             amp_mul: 1.0,
-            running_avg_dur: running_average_dur.as_secs_f32(),
+            running_avg_dur: running_average_dur.to_duration().as_secs_f32(),
         }
     }
     /// End the source after some duration
-    fn take(self, dur: Duration) -> Take<Self>
+    fn take(self, dur: impl ToDuration) -> Take<Self>
     where
         Self: Sized,
     {
         Take {
             source: self,
-            duration: dur,
+            duration: dur.to_duration(),
             elapsed: Duration::ZERO,
             release: Duration::ZERO,
         }
     }
     /// End the source after some duration and apply a release envelope
-    fn take_release(self, dur: Duration, release: Duration) -> Take<Self>
+    fn take_release(self, dur: impl ToDuration, release: impl ToDuration) -> Take<Self>
     where
         Self: Sized,
     {
         Take {
             source: self,
-            duration: dur,
+            duration: dur.to_duration(),
             elapsed: Duration::ZERO,
-            release,
+            release: release.to_duration(),
         }
     }
     /// Chain the source with another
@@ -221,7 +221,7 @@ pub trait Source {
     }
     /// Apply an attack-decay-sustain envelope to the source
     ///
-    /// To apply a release as well, use [`Source::take_release`] after this
+    /// To apply a release as well, use [`Source::take_release`] or [`Source::maintained`] after this
     fn ads<E>(self, envelope: E) -> Ads<Self>
     where
         Self: Sized,
@@ -361,10 +361,10 @@ where
         }
         let frame = self.source.next()?;
         let amp = if self.release.is_zero() {
+            1.0
+        } else {
             let time_left = (self.duration - self.elapsed).as_secs_f32();
             (time_left / self.release.as_secs_f32()).min(1.0)
-        } else {
-            1.0
         };
         self.elapsed += Duration::from_secs_f32(1.0 / self.source.sample_rate());
         Some(frame.map(|a| a * amp))
@@ -550,6 +550,17 @@ impl Default for AdsEnvelope {
             attack: Duration::ZERO,
             decay: Duration::ZERO,
             sustain: 1.0,
+        }
+    }
+}
+
+impl AdsEnvelope {
+    /// Create a new ADS envelope
+    pub fn new(attack: impl ToDuration, decay: impl ToDuration, sustain: f32) -> Self {
+        Self {
+            attack: attack.to_duration(),
+            decay: decay.to_duration(),
+            sustain,
         }
     }
 }

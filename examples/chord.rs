@@ -1,6 +1,4 @@
-use std::time::Duration;
-
-use hodaun::{gen::SineWave, Mixer, MixerInterface, Mono, OutputDeviceMixer, Source};
+use hodaun::*;
 
 fn main() {
     // Initialize the output and a chord mixer
@@ -15,7 +13,7 @@ fn main() {
     chord.add(SineWave::new(base * 2f32.powf(7.0 / 12.0), sample_rate));
 
     // Add the chord to the output, only playing for 3 seconds
-    output.add(chord_source.amplify(0.5).take(Duration::from_secs(3)));
+    output.add(chord_source.amplify(0.5).take(3));
 
     // Play
     output.play_blocking().unwrap();

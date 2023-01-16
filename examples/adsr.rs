@@ -6,7 +6,11 @@ fn main() {
     let sample_rate = output.sample_rate();
 
     // Add a 2 second sine wave
-    output.add(SineWave::new(261.63, sample_rate).amplify(0.5).take(2));
+    output.add(
+        TriangleWave::new(261.63, sample_rate)
+            .ads(AdsEnvelope::new(0.05, 0.1, 0.5))
+            .take_release(2, 0.2),
+    );
 
     // Play
     output.play_blocking().unwrap();
