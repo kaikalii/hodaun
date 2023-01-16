@@ -8,6 +8,8 @@ use crate::source::*;
 
 /// Defines a waveform
 pub trait Waveform {
+    /// The perceptual loudness of this waveform compared to a sine wave
+    const LOUDNESS: f32;
     /// Get the amplitude of a 1 Hz wave at the given time
     ///
     /// This should be in the range [-1.0, 1.0]
@@ -59,10 +61,9 @@ where
         self.sample_rate
     }
     fn next(&mut self) -> Option<Self::Frame> {
-        let res = self.waveform.one_hz(self.time);
+        let res = 1.0 / W::LOUDNESS * self.waveform.one_hz(self.time);
         self.time += self.freq / self.sample_rate;
-        // Some([dbg!(res)])
-        Some([res])
+        Some(res)
     }
 }
 
@@ -70,6 +71,7 @@ where
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Sine;
 impl Waveform for Sine {
+    const LOUDNESS: f32 = 1.0;
     fn one_hz(&self, time: f32) -> f32 {
         (time * TAU).sin()
     }
@@ -79,6 +81,7 @@ impl Waveform for Sine {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Square;
 impl Waveform for Square {
+    const LOUDNESS: f32 = 3.0;
     fn one_hz(&self, time: f32) -> f32 {
         if (time * 2.0) as u64 % 2 == 0 {
             -1.0
@@ -92,6 +95,7 @@ impl Waveform for Square {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Saw;
 impl Waveform for Saw {
+    const LOUDNESS: f32 = 3.0;
     fn one_hz(&self, time: f32) -> f32 {
         2.0 * (time - (time + 0.5).floor())
     }
@@ -101,6 +105,7 @@ impl Waveform for Saw {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Triangle;
 impl Waveform for Triangle {
+    const LOUDNESS: f32 = 1.1;
     fn one_hz(&self, time: f32) -> f32 {
         2.0 * Saw.one_hz(time).abs() - 1.0
     }
@@ -138,6 +143,6 @@ impl Source for Noise {
         self.sample_rate
     }
     fn next(&mut self) -> Option<Self::Frame> {
-        Some([self.rng.gen_range(-1.0..=1.0) as f32])
+        Some(self.rng.gen_range(-1.0..=1.0) as f32)
     }
 }

@@ -3,6 +3,7 @@
 use std::{
     collections::VecDeque,
     marker::PhantomData,
+    ops::Add,
     sync::{Arc, Weak},
     time::Duration,
 };
@@ -10,7 +11,7 @@ use std::{
 use crate::{lerp, Shared, ToDuration};
 
 /// Mono [`Frame`] type
-pub type Mono = [f32; 1];
+pub type Mono = f32;
 /// Stereo [`Frame`] type
 pub type Stereo = [f32; 2];
 
@@ -19,12 +20,12 @@ pub fn mono<F>(frame: F) -> Mono
 where
     F: AsRef<[f32]>,
 {
-    [frame.as_ref().iter().sum::<f32>() / frame.as_ref().len() as f32]
+    frame.as_ref().iter().sum::<f32>() / frame.as_ref().len() as f32
 }
 
 /// Convert a mono frame to stereo
 pub fn stereo(frame: Mono) -> Stereo {
-    [frame[0]; 2]
+    [frame; 2]
 }
 
 /// A single multi-channel frame in an audio source
@@ -50,6 +51,11 @@ pub trait Frame: Default + Clone {
             .map(|i| self.get_channel(i))
             .sum::<f32>()
             / channels as f32
+    }
+    /// Add two frames
+    fn add(mut self, other: Self) -> Self {
+        self.merge(other, Add::add);
+        self
     }
 }
 
