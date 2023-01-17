@@ -5,9 +5,9 @@ fn main() {
     let mut output = OutputDeviceMixer::<Mono>::with_default_device().unwrap();
 
     // Build up a wubby wave
-    let frequency_automation = Constant(55.0)
+    let frequency_automation = Constant(Letter::G.frequency(1))
         .take(4)
-        .chain(Constant(49.0).take(4))
+        .chain(Constant(Letter::F.frequency(1)).take(4))
         .repeat_indefinitely();
     let base = SquareWave::new(frequency_automation.clone()).zip(
         SawWave::new(frequency_automation.map(|s| s * 2.0)),

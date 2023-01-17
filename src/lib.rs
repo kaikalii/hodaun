@@ -9,6 +9,7 @@ pub mod gen;
 #[cfg(any(feature = "input", feature = "output"))]
 mod io;
 mod mixer;
+mod note;
 pub mod source;
 #[cfg(feature = "wav")]
 #[cfg_attr(docsrs, doc(cfg(feature = "wav")))]
@@ -26,7 +27,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-pub use {frame::*, gen::*, mixer::*};
+pub use {frame::*, gen::*, mixer::*, note::*};
 
 use parking_lot::Mutex;
 
