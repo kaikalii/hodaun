@@ -2,6 +2,7 @@ use crate::Automation;
 
 /// The twelve notes of the western chromatic scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(missing_docs)]
 pub enum Letter {
     C,
@@ -76,5 +77,28 @@ impl Pitch {
 impl Automation for Pitch {
     fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
         Some(self.frequency())
+    }
+}
+
+#[cfg(feature = "serde")]
+mod pitch_ser {
+    use super::*;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    impl Serialize for Pitch {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            (self.letter as u8, self.octave).serialize(serializer)
+        }
+    }
+    impl<'de> Deserialize<'de> for Pitch {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: Deserializer<'de>,
+        {
+            let (letter, octave) = Deserialize::deserialize(deserializer)?;
+            Ok(Self { letter, octave })
+        }
     }
 }

@@ -13,6 +13,9 @@ parking_lot = '0.12.1'
 rand.features = ['small_rng']
 rand.optional = true
 rand.version = '0.8.5'
+serde.features = ['derive']
+serde.optional = true
+serde.version = '1'
 thiserror.optional = true
 thiserror.version = '1'
 

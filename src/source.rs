@@ -573,7 +573,7 @@ where
 
 /// Used to coordinate the dropping of [`Source`]s
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Maintainer<R> {
+pub struct Maintainer<R = f32> {
     arc: Arc<()>,
     release_dur: R,
 }
