@@ -49,8 +49,8 @@ impl Pitch {
         self.letter.frequency(self.octave)
     }
     /// Make a pitch from some snumber of half-steps above C0
-    pub fn from_half_steps(half_steps: i8) -> Self {
-        let octave = half_steps / 12;
+    pub fn from_half_steps(half_steps: i16) -> Self {
+        let octave = (half_steps / 12) as i8;
         let letter = match half_steps % 12 {
             0 => Letter::C,
             1 => Letter::Db,
@@ -69,8 +69,8 @@ impl Pitch {
         Self { letter, octave }
     }
     /// Get the number of half-steps above C0
-    pub fn to_half_steps(&self) -> i8 {
-        (self.octave * 12) + (self.letter as i8)
+    pub fn to_half_steps(&self) -> i16 {
+        (self.octave as i16 * 12) + (self.letter as i16)
     }
 }
 
