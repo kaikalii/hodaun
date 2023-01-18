@@ -8,6 +8,7 @@ mod frame;
 pub mod gen;
 #[cfg(any(feature = "input", feature = "output"))]
 mod io;
+#[cfg(feature = "notes")]
 mod mixer;
 mod note;
 pub mod source;
@@ -18,6 +19,8 @@ pub mod wav;
 #[cfg(any(feature = "input", feature = "output"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "input", feature = "output"))))]
 pub use io::*;
+#[cfg(feature = "notes")]
+pub use note::*;
 #[doc(inline)]
 pub use source::{AdsEnvelope, Constant, Maintainer, Source, UnrolledSource};
 use std::{
@@ -27,7 +30,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-pub use {frame::*, gen::*, mixer::*, note::*};
+pub use {frame::*, gen::*, mixer::*};
 
 use parking_lot::Mutex;
 

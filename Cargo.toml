@@ -20,8 +20,9 @@ thiserror.optional = true
 thiserror.version = '1'
 
 [features]
-default = ['input', 'noise', 'output', 'wav']
+default = ['input', 'noise', 'notes', 'output', 'wav']
 input = ['cpal', 'thiserror']
 noise = ['rand']
+notes = []
 output = ['cpal', 'thiserror']
 wav = ['hound']
