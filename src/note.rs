@@ -24,12 +24,16 @@ pub enum Letter {
 
 impl Letter {
     /// Make a pitch with this letter and the given octave.
-    pub fn oct(self, octave: Octave) -> Pitch {
+    pub const fn oct(self, octave: Octave) -> Pitch {
         Pitch::new(self, octave)
     }
     /// Get the frequency of this letter in the given octave.
-    pub fn frequency(&self, octave: Octave) -> f32 {
-        440.0 * 2f32.powf(((octave - 4) * 12 + (*self as i8 - 9)) as f32 / 12.0)
+    pub fn frequency(self, octave: Octave) -> f32 {
+        440.0 * 2f32.powf(((octave - 4) * 12 + (self as i8 - 9)) as f32 / 12.0)
+    }
+    /// Get the number of half-steps above C0
+    pub const fn half_steps(self, octave: Octave) -> i16 {
+        (octave as i16 * 12) + (self as i16)
     }
     #[allow(missing_docs, non_upper_case_globals)]
     pub const Csh: Self = Self::Db;
@@ -54,7 +58,7 @@ pub struct Pitch {
 
 impl Pitch {
     /// Make a new pitch with the given letter and octave
-    pub fn new(letter: Letter, octave: Octave) -> Self {
+    pub const fn new(letter: Letter, octave: Octave) -> Self {
         Self { letter, octave }
     }
     /// Get the frequency of this pitch
@@ -62,8 +66,8 @@ impl Pitch {
         self.letter.frequency(self.octave)
     }
     /// Make a pitch from some snumber of half-steps above C0
-    pub fn from_half_steps(half_steps: i16) -> Self {
-        let octave = (half_steps / 12) as Octave;
+    pub const fn from_half_steps(half_steps: i16) -> Self {
+        let octave = (half_steps / 12) as i8;
         let letter = match half_steps % 12 {
             0 => Letter::C,
             1 => Letter::Db,
@@ -82,8 +86,8 @@ impl Pitch {
         Self { letter, octave }
     }
     /// Get the number of half-steps above C0
-    pub fn to_half_steps(&self) -> i16 {
-        (self.octave as i16 * 12) + (self.letter as i16)
+    pub const fn to_half_steps(&self) -> i16 {
+        self.letter.half_steps(self.octave)
     }
 }
 
