@@ -1,3 +1,6 @@
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::Automation;
 
 /// Type alias for an octave
@@ -5,7 +8,7 @@ pub type Octave = i8;
 
 /// The twelve notes of the western chromatic scale.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[allow(missing_docs)]
 pub enum Letter {
     C,
@@ -122,15 +125,41 @@ impl PartialEq<Pitch> for (Letter, Octave) {
 }
 
 #[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Letter {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = <&str>::deserialize(deserializer)?;
+        match s.to_lowercase().as_str() {
+            "c" => Ok(Letter::C),
+            "db" | "c#" | "csh" => Ok(Letter::Db),
+            "d" => Ok(Letter::D),
+            "eb" | "d#" | "dsh" => Ok(Letter::Eb),
+            "e" => Ok(Letter::E),
+            "f" => Ok(Letter::F),
+            "gb" | "f#" | "fsh" => Ok(Letter::Gb),
+            "g" => Ok(Letter::G),
+            "ab" | "g#" | "gsh" => Ok(Letter::Ab),
+            "a" => Ok(Letter::A),
+            "bb" | "a#" | "ash" => Ok(Letter::Bb),
+            "b" => Ok(Letter::B),
+            _ => Err(serde::de::Error::custom(format!(
+                "Invalid note letter: {s:?}"
+            ))),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
 mod pitch_ser {
     use super::*;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
     impl Serialize for Pitch {
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
         {
-            (self.letter as u8, self.octave).serialize(serializer)
+            (self.letter, self.octave).serialize(serializer)
         }
     }
     impl<'de> Deserialize<'de> for Pitch {
