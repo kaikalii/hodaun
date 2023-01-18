@@ -10,7 +10,7 @@ pub fn mono(frame: impl AsRef<[f32]>) -> Mono {
     frame.as_ref().iter().sum::<f32>() / frame.as_ref().len() as f32
 }
 
-/// Convert a mono frame to stereo
+/// Convert a mono [`Frame`] to stereo
 pub fn stereo(frame: Mono) -> Stereo {
     [frame; 2]
 }
