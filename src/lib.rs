@@ -18,10 +18,10 @@ Many [`Source`] functions take parameters that can be automated, meaning they ma
 over time or manually by some other code. The [`Automation`] trait is for any value which can be used
 as an automation parameter.
 
-The three primary [`Automation`] implementors are:
-- [`f32`] for constant values
-- [`Shared<f32>`] for values that can be changed by other code
-- [`Source`] (with [`Source::Frame`]` = f32`) for values that change over time
+The primary [`Automation`] implementors are:
+- [`f32`], `(`[`Letter`]`,`[`Octave`]`)`, and [`Pitch`] for constant values
+- [`Shared`]`<A: `[`Automation`]`>` for values that can be changed by other code
+- [`Source`]`<Frame = f32>` for values that change over time
 
 ## Mixing
 
@@ -185,10 +185,13 @@ impl Automation for u64 {
     }
 }
 
-impl Automation for Shared<f32> {
+impl<A> Automation for Shared<A>
+where
+    A: Automation,
+{
     #[inline(always)]
-    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
-        Some(self.get())
+    fn next_value(&mut self, sample_rate: f32) -> Option<f32> {
+        self.with(|auto| auto.next_value(sample_rate))
     }
 }
 
@@ -214,8 +217,12 @@ impl<T> Shared<T> {
         Shared(Arc::new(Mutex::new(val)))
     }
     /// Set the value
-    pub fn set(&self, val: T) {
+    pub fn set(&mut self, val: T) {
         *self.0.lock() = val;
+    }
+    /// Modify the value
+    pub fn with<R>(&mut self, f: impl FnOnce(&mut T) -> R) -> R {
+        f(&mut *self.0.lock())
     }
 }
 

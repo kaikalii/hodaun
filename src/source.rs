@@ -2,7 +2,6 @@
 
 use std::{
     marker::PhantomData,
-    ops::Add,
     sync::{Arc, Weak},
 };
 
@@ -31,6 +30,7 @@ pub trait UnrolledSource: Iterator<Item = f32> {
     fn resample<F>(self) -> Resample<Self, F>
     where
         Self: Sized,
+        F: Frame,
     {
         Resample {
             source: self,
@@ -53,6 +53,7 @@ pub trait Source {
     fn amplify<A>(self, amp: A) -> Amplify<Self, A>
     where
         Self: Sized,
+        A: Automation,
     {
         Amplify { source: self, amp }
     }
@@ -72,6 +73,7 @@ pub trait Source {
     fn take_release<R>(self, dur: impl ToDuration, release: R) -> Take<Self, R>
     where
         Self: Sized,
+        R: Automation,
     {
         Take {
             source: self,
@@ -84,6 +86,7 @@ pub trait Source {
     fn chain<B>(self, next: B) -> Chain<Self, B>
     where
         Self: Sized,
+        B: Source<Frame = Self::Frame>,
     {
         Chain {
             a: self,
@@ -96,6 +99,7 @@ pub trait Source {
     fn low_pass<F>(self, freq: F) -> LowPass<Self, F>
     where
         Self: Sized,
+        F: Automation,
     {
         LowPass {
             source: self,
@@ -104,9 +108,10 @@ pub trait Source {
         }
     }
     /// Transform each frame with the given function
-    fn map<F>(self, f: F) -> Map<Self, F>
+    fn map<F, B>(self, f: F) -> Map<Self, F>
     where
         Self: Sized,
+        F: Fn(Self::Frame) -> B,
     {
         Map { source: self, f }
     }
@@ -115,6 +120,7 @@ pub trait Source {
     where
         Self: Sized,
         B: Source,
+        F: Fn(Self::Frame, B::Frame) -> Self::Frame,
     {
         Zip {
             a: self,
@@ -123,11 +129,12 @@ pub trait Source {
         }
     }
     /// Combine this source with another by adding their frames
-    fn mix(self, other: Self) -> Zip<Self, Self, fn(f32, f32) -> f32>
+    fn mix<B>(self, other: B) -> Zip<Self, B, fn(Self::Frame, Self::Frame) -> Self::Frame>
     where
         Self: Sized,
+        B: Source<Frame = Self::Frame>,
     {
-        self.zip(other, Add::add)
+        self.zip(other, Frame::add)
     }
     /// Apply a pan to the source
     ///
@@ -135,6 +142,7 @@ pub trait Source {
     fn pan<P>(self, pan: P) -> Pan<Self, P>
     where
         Self: Sized,
+        P: Automation,
     {
         Pan { source: self, pan }
     }
@@ -194,6 +202,9 @@ pub trait Source {
     fn ads<A, D, S>(self, envelope: AdsEnvelope<A, D, S>) -> Ads<Self, A, D, S>
     where
         Self: Sized,
+        A: Automation,
+        D: Automation,
+        S: Automation,
     {
         Ads {
             source: self,
@@ -205,7 +216,7 @@ pub trait Source {
     fn maintained<R>(self, maintainer: &Maintainer<R>) -> Maintained<Self, R>
     where
         Self: Sized,
-        R: Clone,
+        R: Automation + Clone,
     {
         Maintained {
             source: self,
@@ -596,7 +607,10 @@ where
     }
 }
 
-impl<R> Maintainer<R> {
+impl<R> Maintainer<R>
+where
+    R: Automation,
+{
     /// Create a new maintainer with the given release duration
     pub fn with_release(release_dur: R) -> Self {
         Maintainer {
@@ -632,7 +646,12 @@ where
     }
 }
 
-impl<A, D, S> AdsEnvelope<A, D, S> {
+impl<A, D, S> AdsEnvelope<A, D, S>
+where
+    A: Automation,
+    D: Automation,
+    S: Automation,
+{
     /// Create a new ADS envelope
     pub fn new(attack: A, decay: D, sustain: S) -> Self {
         Self {
