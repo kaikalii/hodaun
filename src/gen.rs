@@ -1,6 +1,6 @@
 //! Wave generation
 
-use std::f32::consts::TAU;
+use std::{f32::consts::TAU, time::Instant};
 
 #[cfg(feature = "rand")]
 use rand::prelude::*;
@@ -129,7 +129,7 @@ impl Noise {
     /// Create new noise with the given sample rate
     pub fn new() -> Self {
         Noise {
-            rng: SmallRng::from_entropy(),
+            rng: SmallRng::seed_from_u64(Instant::now().elapsed().as_nanos() as u64),
         }
     }
 }
