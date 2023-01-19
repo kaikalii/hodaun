@@ -112,6 +112,12 @@ impl From<(Letter, Octave)> for Pitch {
     }
 }
 
+impl From<i16> for Pitch {
+    fn from(half_steps: i16) -> Self {
+        Self::from_half_steps(half_steps)
+    }
+}
+
 impl PartialEq<(Letter, Octave)> for Pitch {
     fn eq(&self, other: &(Letter, Octave)) -> bool {
         self.letter == other.0 && self.octave == other.1

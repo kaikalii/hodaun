@@ -5,12 +5,11 @@ use crate::{
         traits::{DeviceTrait, HostTrait, StreamTrait},
         *,
     },
-    Mixer, MixerSource,
+    Mixer,
 };
 
 use crate::{
-    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame,
-    MixerInterface, Source,
+    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame, Mix, Source,
 };
 
 /// Get the default output device
@@ -27,7 +26,7 @@ pub struct OutputDeviceMixer<F> {
     sample_rate: u32,
 }
 
-impl<F> MixerInterface for OutputDeviceMixer<F>
+impl<F> Mix for OutputDeviceMixer<F>
 where
     F: Frame + Send + 'static,
 {
@@ -66,12 +65,13 @@ where
         let sample_format = config.sample_format();
         let config = StreamConfig::from(config);
         let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
-        let (mixer, mixer_source) = Mixer::new();
+        let mixer = Mixer::new();
+        let mixer_clone = mixer.clone();
         macro_rules! output_stream {
             ($sample:ty) => {
                 device.build_output_stream(
                     &config,
-                    write_sources::<F, $sample>(mixer_source, &config),
+                    write_sources::<F, $sample>(mixer_clone, &config),
                     err_fn,
                 )
             };
@@ -110,7 +110,7 @@ where
 }
 
 fn write_sources<F, A>(
-    mut mixer_source: MixerSource<F>,
+    mut mixer: Mixer<F>,
     config: &StreamConfig,
 ) -> impl FnMut(&mut [A], &OutputCallbackInfo)
 where
@@ -126,7 +126,7 @@ where
         for out_sample in buffer {
             if i >= channels {
                 i = 0;
-                if let Some(frame) = mixer_source.next(sample_rate) {
+                if let Some(frame) = mixer.next(sample_rate) {
                     frame.write_slice(&mut frame_buffer);
                 } else {
                     break;

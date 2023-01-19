@@ -743,13 +743,12 @@ where
     }
 }
 
-/// Source returned from [`Source::buffered`]
+/// Source returned from [`Source::buffer`]
 pub struct Buffered<S: Source> {
     inner: Arc<Mutex<BufferedInner<S>>>,
     time: f32,
 }
 
-/// Source returned from [`Source::buffered`]
 struct BufferedInner<S: Source> {
     source: S,
     buffer: Vec<S::Frame>,

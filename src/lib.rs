@@ -1,7 +1,81 @@
 #![warn(missing_docs)]
 
 /*!
-This crate provides interfaces for audio input and output, as well as mixing and signal processing.
+This crate provides interfaces for audio synthesis, mixing, input, and output.
+
+# Usage
+
+## Audio Sources
+
+The [`Source`] trait generalizes streamed audio data. The associated type [`Source::Frame`]
+implements the [`Frame`] trait, and represents a single sample of audio data for multiple channels.
+
+[`Source`] has many utility functions, much like [`Iterator`], for processing and combining audio data.
+
+## Automation
+
+Many [`Source`] functions take parameters that can be automated, meaning they may change either automatically
+over time or manually by some other code. The [`Automation`] trait is for any value which can be used
+as an automation parameter.
+
+The three primary [`Automation`] implementors are:
+- [`f32`] for constant values
+- [`Shared<f32>`] for values that can be changed by other code
+- [`Source`] (with [`Source::Frame`]` = f32`) for values that change over time
+
+## Mixing
+
+[`Mixer`] is a [`Source`] that allows simple audio mixing.
+It implements [`Mix`], which allows adding sources to be mixed.
+
+## Synthesis
+
+The [`gen`] module provides a functions for generating audio data.
+
+[`Wave`] is a source that generates a wave corresponding to a [`Waveform`].
+
+There are helpful type aliases for common waveforms such as [`SineWave`] and [`SquareWave`].
+
+[`Noise`] is a source that generates white noise. It requires the `noise` feature.
+
+## Output
+
+[`OutputDeviceMixer`] is a [`Mix`] interface for an audio output device.
+An [`OutputDeviceMixer`] for the default output device can be created with
+[`OutputDeviceMixer::with_default_device`].
+For more nuanced control, use [`DeviceIoBuilder::build_output`].
+
+Output functionality is only available when the `output` feature is enabled.
+
+## Input
+
+[`InputDeviceSource`] is a [`Source`] interface for an audio input device.
+An [`InputDeviceSource`] for the default input device can be created with
+[`InputDeviceSource::with_default_device`].
+For more nuanced control, use [`DeviceIoBuilder::build_input`].
+
+Input functionality is only available when the `input` feature is enabled.
+
+## Audio Files
+
+The [`wav`] module provides [`wav::WaveSource`] for reading WAV files and
+[`wav::write_source`] for writing WAV files.
+
+WAV functionality is only available when the `wav` feature is enabled.
+
+## Musical Notes
+
+A [`Letter`] is a note in the western chromatic scale, such as `A` or `C#`.
+
+When combined with an [`Octave`], a [`Letter`] can be converted to a [`Pitch`].
+
+[`Pitch`] supports querying for frequency and number of half-steps.
+It also implements [`Automation`].
+
+[`Mode`] is a musical mode, such as major or minor.
+It can be used to choose notes from a scale.
+
+Musical note functionality is only available when the `notes` feature is enabled.
 */
 
 mod frame;

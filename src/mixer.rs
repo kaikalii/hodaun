@@ -4,8 +4,8 @@ use parking_lot::Mutex;
 
 use crate::{source::*, Frame};
 
-/// Trait for combining [`Source`]s
-pub trait MixerInterface {
+/// Trait for mixing [`Source`]s
+pub trait Mix {
     /// The frame type
     type Frame: Frame;
     /// Add a source to the mixer to be played immediately
@@ -14,22 +14,13 @@ pub trait MixerInterface {
         S: Source<Frame = Self::Frame> + Send + 'static;
 }
 
-/// The [`Source`] used to play sources combined in a [`Mixer`]
-#[derive(Clone)]
-pub struct MixerSource<F> {
-    sources: Arc<Mutex<Vec<DynamicSource<F>>>>,
-}
-
-/// An interface for combining [`Source`]s into a new [`Source`]
-///
-/// [`Mixer`] is the interface, which implements [`MixerInterface`].
-/// [`MixerSource`] is the actual [`Source`].
+/// An [`Source`] that mixes multiple [`Source`]s together
 #[derive(Clone)]
 pub struct Mixer<F> {
     pub(crate) sources: Arc<Mutex<Vec<DynamicSource<F>>>>,
 }
 
-impl<F> MixerInterface for Mixer<F>
+impl<F> Mix for Mixer<F>
 where
     F: Frame,
 {
@@ -42,20 +33,22 @@ where
     }
 }
 
-impl<F> Mixer<F> {
-    /// Create a new mixer interface and corresponing [`Source`]
-    pub fn new() -> (Mixer<F>, MixerSource<F>) {
-        let sources = Arc::new(Mutex::new(Vec::new()));
-        (
-            Mixer {
-                sources: Arc::clone(&sources),
-            },
-            MixerSource { sources },
-        )
+impl<F> Default for Mixer<F> {
+    fn default() -> Self {
+        Mixer {
+            sources: Arc::new(Mutex::new(Vec::new())),
+        }
     }
 }
 
-impl<F> Source for MixerSource<F>
+impl<F> Mixer<F> {
+    /// Create a new mixer
+    pub fn new() -> Mixer<F> {
+        Self::default()
+    }
+}
+
+impl<F> Source for Mixer<F>
 where
     F: Frame,
 {
