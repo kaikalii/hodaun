@@ -2,6 +2,7 @@
 
 use std::{
     marker::PhantomData,
+    ops::Add,
     sync::{Arc, Weak},
 };
 
@@ -120,6 +121,13 @@ pub trait Source {
             b: other,
             f,
         }
+    }
+    /// Combine this source with another by adding their frames
+    fn mix(self, other: Self) -> Zip<Self, Self, fn(f32, f32) -> f32>
+    where
+        Self: Sized,
+    {
+        self.zip(other, Add::add)
     }
     /// Apply a pan to the source
     ///
