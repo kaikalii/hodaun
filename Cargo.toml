@@ -9,6 +9,8 @@ cpal.optional = true
 cpal.version = '0.14.2'
 hound.optional = true
 hound.version = '3.5.0'
+lewton.optional = true
+lewton.version = '0.10.2'
 parking_lot = '0.12.1'
 rand.default-features = false
 rand.features = ['small_rng']
@@ -21,9 +23,10 @@ thiserror.optional = true
 thiserror.version = '1'
 
 [features]
-default = ['input', 'noise', 'notes', 'output', 'wav']
+default = ['input', 'noise', 'notes', 'output', 'wav', 'ogg']
 input = ['cpal', 'thiserror']
 noise = ['rand']
 notes = []
+ogg = ['lewton']
 output = ['cpal', 'thiserror']
 wav = ['hound']

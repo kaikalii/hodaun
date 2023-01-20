@@ -112,6 +112,7 @@ use parking_lot::Mutex;
 trait Amplitude: Clone + std::ops::AddAssign<Self> {
     const MIDPOINT: Self;
     fn from_f32(f: f32) -> Self;
+    fn into_f32(self) -> f32;
 }
 
 impl Amplitude for f32 {
@@ -119,21 +120,30 @@ impl Amplitude for f32 {
     fn from_f32(f: f32) -> Self {
         f
     }
-}
-
-impl Amplitude for u16 {
-    const MIDPOINT: Self = u16::MAX / 2;
-    fn from_f32(f: f32) -> Self {
-        const HALF_U16_MAX: f32 = u16::MAX as f32 * 0.5;
-        (f * HALF_U16_MAX + HALF_U16_MAX) as u16
+    fn into_f32(self) -> f32 {
+        self
     }
 }
 
+const HALF_U16_MAX: f32 = u16::MAX as f32 * 0.5;
+impl Amplitude for u16 {
+    const MIDPOINT: Self = u16::MAX / 2;
+    fn from_f32(f: f32) -> Self {
+        (f * HALF_U16_MAX + HALF_U16_MAX) as u16
+    }
+    fn into_f32(self) -> f32 {
+        (self as f32 - HALF_U16_MAX) / HALF_U16_MAX
+    }
+}
+
+const I16_MAX: f32 = i16::MAX as f32;
 impl Amplitude for i16 {
     const MIDPOINT: Self = 0;
     fn from_f32(f: f32) -> Self {
-        const I16_MAX: f32 = i16::MAX as f32;
         (f * I16_MAX) as i16
+    }
+    fn into_f32(self) -> f32 {
+        self as f32 / I16_MAX
     }
 }
 

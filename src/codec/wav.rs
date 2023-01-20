@@ -6,7 +6,7 @@ use hound::{SampleFormat, WavIntoSamples, WavReader, WavSpec, WavWriter};
 
 use crate::{Frame, Source, UnrolledSource};
 
-pub use hound::Error as WaveError;
+pub use hound::Error as WavError;
 
 /// A source that reads from a WAV file
 pub struct WavSource<R> {
@@ -20,7 +20,7 @@ where
     R: Read,
 {
     /// Create a new WAV source from a reader
-    pub fn new(reader: R) -> Result<Self, WaveError> {
+    pub fn new(reader: R) -> Result<Self, WavError> {
         let reader = WavReader::new(reader)?;
         Ok(Self {
             sample_rate: reader.spec().sample_rate,
@@ -55,7 +55,7 @@ where
 }
 
 /// Write a source to a WAV file
-pub fn write_source<W, S>(writer: W, mut source: S, sample_rate: u32) -> Result<(), WaveError>
+pub fn write_source<W, S>(writer: W, mut source: S, sample_rate: u32) -> Result<(), WavError>
 where
     W: Write + Seek,
     S: Source,

@@ -1,12 +1,12 @@
 use std::sync::mpsc;
 
-use crate::cpal::{
-    traits::{DeviceTrait, HostTrait, StreamTrait},
-    *,
-};
-
 use crate::{
-    source::UnrolledSource, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder,
+    cpal::{
+        traits::{DeviceTrait, HostTrait, StreamTrait},
+        *,
+    },
+    source::UnrolledSource,
+    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder,
 };
 
 /// Get the default input device
@@ -70,7 +70,7 @@ impl InputDeviceSource {
                     &config,
                     move |data: &[$sample], _: &InputCallbackInfo| {
                         for &s in data {
-                            let _ = send.send(s.to_f32());
+                            let _ = send.send(s.into_f32());
                         }
                     },
                     err_fn,
