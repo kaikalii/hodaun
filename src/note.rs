@@ -247,7 +247,7 @@ impl Mode {
     /// ```
     pub fn note(&self, base: impl Into<Pitch>, steps: i16) -> Pitch {
         let i = base.into().to_half_steps() * 7 / 12 + steps;
-        let octave = (i / 7) as i16;
+        let octave = i / 7;
         let half_step = self.scale()[(i % 7) as usize];
         let half_steps = (octave * 12) + (half_step);
         Pitch::from_half_steps(half_steps)

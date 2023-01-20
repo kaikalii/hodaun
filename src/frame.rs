@@ -49,6 +49,7 @@ pub trait Frame: Clone {
         match (Self::CHANNELS, slice.len()) {
             (1, _) => slice.fill(self.get_channel(0)),
             (_, 1) => slice[0] = self.avg(),
+            #[allow(clippy::needless_range_loop)]
             (a, b) => {
                 for i in 0..a.min(b) {
                     slice[i] = self.get_channel(i);

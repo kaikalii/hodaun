@@ -129,6 +129,7 @@ pub trait Source {
         }
     }
     /// Combine this source with another by adding their frames
+    #[allow(clippy::type_complexity)]
     fn mix<B>(self, other: B) -> Zip<Self, B, fn(Self::Frame, Self::Frame) -> Self::Frame>
     where
         Self: Sized,
