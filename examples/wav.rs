@@ -10,7 +10,7 @@ fn main() {
 
     // Read from a WAV file
     let file = File::open("example.wav").unwrap();
-    let source = wav::WaveSource::new(file).unwrap().resample::<Mono>();
+    let source = wav::WavSource::new(file).unwrap().resample::<Mono>();
     let mut output = OutputDeviceMixer::with_default_device().unwrap();
     output.add(source);
     output.play_blocking().unwrap();

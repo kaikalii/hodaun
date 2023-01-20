@@ -9,13 +9,13 @@ use crate::{Frame, Source, UnrolledSource};
 pub use hound::Error as WaveError;
 
 /// A source that reads from a WAV file
-pub struct WaveSource<R> {
+pub struct WavSource<R> {
     sample_rate: u32,
     channels: u16,
     samples: WavIntoSamples<R, f32>,
 }
 
-impl<R> WaveSource<R>
+impl<R> WavSource<R>
 where
     R: Read,
 {
@@ -30,7 +30,7 @@ where
     }
 }
 
-impl<R> Iterator for WaveSource<R>
+impl<R> Iterator for WavSource<R>
 where
     R: Read,
 {
@@ -42,7 +42,7 @@ where
     }
 }
 
-impl<R> UnrolledSource for WaveSource<R>
+impl<R> UnrolledSource for WavSource<R>
 where
     R: Read,
 {

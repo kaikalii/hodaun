@@ -58,7 +58,7 @@ Input functionality is only available when the `input` feature is enabled.
 
 ## Audio Files
 
-The [`wav`] module provides [`wav::WaveSource`] for reading WAV files and
+The [`wav`] module provides [`wav::WavSource`] for reading WAV files and
 [`wav::write_source`] for writing WAV files.
 
 WAV functionality is only available when the `wav` feature is enabled.
@@ -78,6 +78,8 @@ It can be used to choose notes from a scale.
 Musical note functionality is only available when the `notes` feature is enabled.
 */
 
+#[cfg(any(feature = "wav", feature = "ogg"))]
+mod codec;
 mod frame;
 pub mod gen;
 #[cfg(any(feature = "input", feature = "output"))]
@@ -86,10 +88,9 @@ mod io;
 mod mixer;
 mod note;
 pub mod source;
-#[cfg(feature = "wav")]
-#[cfg_attr(docsrs, doc(cfg(feature = "wav")))]
-pub mod wav;
 
+#[cfg(any(feature = "wav", feature = "ogg"))]
+pub use codec::*;
 #[cfg(any(feature = "input", feature = "output"))]
 #[cfg_attr(docsrs, doc(cfg(any(feature = "input", feature = "output"))))]
 pub use io::*;
