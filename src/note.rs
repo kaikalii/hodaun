@@ -32,7 +32,7 @@ impl Letter {
     }
     /// Get the frequency of this letter in the given octave.
     pub fn frequency(self, octave: Octave) -> f32 {
-        440.0 * 2f32.powf(((octave - 4) * 12 + (self as i8 - 9)) as f32 / 12.0)
+        440.0 * 2f32.powf(((octave as f32 - 4.0) * 12.0 + (self as i8 as f32 - 9.0)) / 12.0)
     }
     /// Get the number of half-steps above C0
     pub const fn half_steps(self, octave: Octave) -> i16 {

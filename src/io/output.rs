@@ -64,7 +64,7 @@ where
         };
         let sample_format = config.sample_format();
         let config = StreamConfig::from(config);
-        let err_fn = |err| eprintln!("an error occurred on the output audio stream: {}", err);
+        let err_fn = |err| eprintln!("an error occurred on the output audio stream: {err}");
         let mixer = Mixer::new();
         let mixer_clone = mixer.clone();
         macro_rules! output_stream {

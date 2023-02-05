@@ -60,7 +60,7 @@ impl InputDeviceSource {
         } else {
             device.default_input_config()?
         };
-        let err_fn = |err| eprintln!("An error occurred on the input audio stream: {}", err);
+        let err_fn = |err| eprintln!("An error occurred on the input audio stream: {err}");
         let sample_format = config.sample_format();
         let config: StreamConfig = config.into();
         let (send, recv) = mpsc::channel();
