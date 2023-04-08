@@ -6,7 +6,7 @@ version = '0.1.0'
 
 [dependencies]
 cpal.optional = true
-cpal.version = '0.14.2'
+cpal.version = '0.15.2'
 hound.optional = true
 hound.version = '3.5.0'
 parking_lot = '0.12.1'

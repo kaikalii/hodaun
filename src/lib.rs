@@ -137,6 +137,61 @@ impl Amplitude for i16 {
     }
 }
 
+impl Amplitude for u8 {
+    const MIDPOINT: Self = u8::MAX / 2;
+    fn from_f32(f: f32) -> Self {
+        const HALF_U8_MAX: f32 = u8::MAX as f32 * 0.5;
+        (f * HALF_U8_MAX + HALF_U8_MAX) as u8
+    }
+}
+
+impl Amplitude for i8 {
+    const MIDPOINT: Self = 0;
+    fn from_f32(f: f32) -> Self {
+        const I8_MAX: f32 = i8::MAX as f32;
+        (f * I8_MAX) as i8
+    }
+}
+
+impl Amplitude for u32 {
+    const MIDPOINT: Self = u32::MAX / 2;
+    fn from_f32(f: f32) -> Self {
+        const HALF_U32_MAX: f32 = u32::MAX as f32 * 0.5;
+        (f * HALF_U32_MAX + HALF_U32_MAX) as u32
+    }
+}
+
+impl Amplitude for i32 {
+    const MIDPOINT: Self = 0;
+    fn from_f32(f: f32) -> Self {
+        const I32_MAX: f32 = i32::MAX as f32;
+        (f * I32_MAX) as i32
+    }
+}
+
+impl Amplitude for u64 {
+    const MIDPOINT: Self = u64::MAX / 2;
+    fn from_f32(f: f32) -> Self {
+        const HALF_U64_MAX: f32 = u64::MAX as f32 * 0.5;
+        (f * HALF_U64_MAX + HALF_U64_MAX) as u64
+    }
+}
+
+impl Amplitude for i64 {
+    const MIDPOINT: Self = 0;
+    fn from_f32(f: f32) -> Self {
+        const I64_MAX: f32 = i64::MAX as f32;
+        (f * I64_MAX) as i64
+    }
+}
+
+impl Amplitude for f64 {
+    const MIDPOINT: Self = 0.0;
+    fn from_f32(f: f32) -> Self {
+        f as f64
+    }
+}
+
 /// Linearly interpolate two numbers
 pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
     (1.0 - t) * a + t * b

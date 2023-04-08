@@ -65,22 +65,31 @@ impl InputDeviceSource {
         let config: StreamConfig = config.into();
         let (send, recv) = mpsc::channel();
         macro_rules! input_stream {
-            ($sample:ty) => {
+            ($sample:ty, |$x:ident| $convert:expr) => {
                 device.build_input_stream(
                     &config,
                     move |data: &[$sample], _: &InputCallbackInfo| {
-                        for &s in data {
-                            let _ = send.send(s.to_f32());
+                        for &$x in data {
+                            let _ = send.send($convert);
                         }
                     },
                     err_fn,
+                    None,
                 )
             };
         }
         let stream = match sample_format {
-            SampleFormat::F32 => input_stream!(f32),
-            SampleFormat::I16 => input_stream!(i16),
-            SampleFormat::U16 => input_stream!(u16),
+            SampleFormat::F32 => input_stream!(f32, |x| x),
+            SampleFormat::I16 => input_stream!(i16, |x| x as f32 / i16::MAX as f32),
+            SampleFormat::U16 => input_stream!(u16, |x| x as f32 - u16::MAX as f32 / 2.0),
+            SampleFormat::I8 => input_stream!(i8, |x| x as f32 / i8::MAX as f32),
+            SampleFormat::I32 => input_stream!(i32, |x| x as f32 / i32::MAX as f32),
+            SampleFormat::I64 => input_stream!(i64, |x| x as f32 / i64::MAX as f32),
+            SampleFormat::U8 => input_stream!(u8, |x| x as f32 - u8::MAX as f32 / 2.0),
+            SampleFormat::U32 => input_stream!(u32, |x| x as f32 - u32::MAX as f32 / 2.0),
+            SampleFormat::U64 => input_stream!(u64, |x| x as f32 - u64::MAX as f32 / 2.0),
+            SampleFormat::F64 => input_stream!(f64, |x| x as f32),
+            _ => return Err(BuildSystemAudioError::UnsupportedSampleFormat),
         }?;
 
         stream.play()?;

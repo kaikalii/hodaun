@@ -73,6 +73,7 @@ where
                     &config,
                     write_sources::<F, $sample>(mixer_clone, &config),
                     err_fn,
+                    None,
                 )
             };
         }
@@ -80,6 +81,14 @@ where
             SampleFormat::F32 => output_stream!(f32),
             SampleFormat::I16 => output_stream!(i16),
             SampleFormat::U16 => output_stream!(u16),
+            SampleFormat::I8 => output_stream!(i8),
+            SampleFormat::I32 => output_stream!(i32),
+            SampleFormat::I64 => output_stream!(i64),
+            SampleFormat::U8 => output_stream!(u8),
+            SampleFormat::U32 => output_stream!(u32),
+            SampleFormat::U64 => output_stream!(u64),
+            SampleFormat::F64 => output_stream!(f64),
+            _ => return Err(BuildSystemAudioError::UnsupportedSampleFormat),
         }
         .unwrap();
         Ok(OutputDeviceMixer {

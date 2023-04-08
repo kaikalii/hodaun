@@ -34,6 +34,9 @@ pub enum BuildSystemAudioError {
     /// No default input device is available
     #[error("No device available")]
     NoDevice,
+    /// The device does not support the requested sample format
+    #[error("Unsupported sample format")]
+    UnsupportedSampleFormat,
 }
 
 /// A result type for trying to build audio I/O sources
