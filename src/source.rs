@@ -15,11 +15,11 @@ use crate::{lerp, Automation, Frame, Shared, Stereo, ToDuration};
 /// is only known at runtime, like audio input.
 ///
 /// It can be converted to a [`Source`] by with [`UnrolledSource::resample`].
-pub trait UnrolledSource: Iterator<Item = f32> {
+pub trait UnrolledSource: Iterator<Item = f64> {
     /// Get the number of audio channels
     fn channels(&self) -> usize;
     /// Get the sample rate
-    fn sample_rate(&self) -> f32;
+    fn sample_rate(&self) -> f64;
     /// Resample this source to have a static frame size
     ///
     /// For a frame size of 1, the source samples are averaged.
@@ -48,7 +48,7 @@ pub trait Source {
     /// Get the next frame
     ///
     /// Returning [`None`] indicates the source has no samples left
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame>;
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame>;
     /// Amplify the source by some multiplier
     fn amplify<A>(self, amp: A) -> Amplify<Self, A>
     where
@@ -58,13 +58,13 @@ pub trait Source {
         Amplify { source: self, amp }
     }
     /// End the source after some duration
-    fn take(self, dur: impl ToDuration) -> Take<Self, f32>
+    fn take(self, dur: impl ToDuration) -> Take<Self, f64>
     where
         Self: Sized,
     {
         Take {
             source: self,
-            duration: dur.to_duration().as_secs_f32(),
+            duration: dur.to_duration().as_secs_f64(),
             elapsed: 0.0,
             release: 0.0,
         }
@@ -77,7 +77,7 @@ pub trait Source {
     {
         Take {
             source: self,
-            duration: dur.to_duration().as_secs_f32(),
+            duration: dur.to_duration().as_secs_f64(),
             elapsed: 0.0,
             release,
         }
@@ -158,7 +158,7 @@ pub trait Source {
         Positive { source: self }
     }
     /// Repeat a source `n` times
-    fn repeat(self, n: usize) -> Repeat<Self, f32>
+    fn repeat(self, n: usize) -> Repeat<Self, f64>
     where
         Self: Sized,
     {
@@ -172,7 +172,7 @@ pub trait Source {
         }
     }
     /// Repeat a source indefinitely
-    fn repeat_indefinitely(self) -> Repeat<Self, f32>
+    fn repeat_indefinitely(self) -> Repeat<Self, f64>
     where
         Self: Sized,
     {
@@ -256,7 +256,7 @@ pub trait Source {
         }
     }
     /// Unroll the source so that its samples are flat
-    fn unroll(self, sample_rate: f32) -> Unroll<Self>
+    fn unroll(self, sample_rate: f64) -> Unroll<Self>
     where
         Self: Sized,
     {
@@ -273,11 +273,11 @@ pub(crate) type DynamicSource<F> = Box<dyn Source<Frame = F> + Send + 'static>;
 
 /// A source that returns a constant value
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
-pub struct Constant(pub f32);
+pub struct Constant(pub f64);
 
 impl Source for Constant {
-    type Frame = f32;
-    fn next(&mut self, _sample_rate: f32) -> Option<Self::Frame> {
+    type Frame = f64;
+    fn next(&mut self, _sample_rate: f64) -> Option<Self::Frame> {
         Some(self.0)
     }
 }
@@ -295,7 +295,7 @@ where
     A: Automation,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let frame = self.source.next(sample_rate)?;
         let amp = self.amp.next_value(sample_rate)?;
         Some(frame.map(|a| a * amp))
@@ -306,8 +306,8 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct Take<S, R> {
     source: S,
-    duration: f32,
-    elapsed: f32,
+    duration: f64,
+    elapsed: f64,
     release: R,
 }
 
@@ -317,7 +317,7 @@ where
     R: Automation,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         if self.elapsed >= self.duration {
             return None;
         }
@@ -339,8 +339,8 @@ where
 pub struct Chain<A, B> {
     a: A,
     b: B,
-    b_start: Option<f32>,
-    time: f32,
+    b_start: Option<f64>,
+    time: f64,
 }
 
 impl<A, B> Source for Chain<A, B>
@@ -349,7 +349,7 @@ where
     B: Source<Frame = A::Frame>,
 {
     type Frame = A::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let frame = if let Some(a) = self.a.next(sample_rate) {
             match self.b_start {
                 Some(b_start) if self.time >= b_start => {
@@ -389,7 +389,7 @@ where
     S::Frame: std::fmt::Debug,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let freq = self.freq.next_value(sample_rate)?;
         let frame = self.source.next(sample_rate)?;
         Some(if let Some(acc) = &mut self.acc {
@@ -417,7 +417,7 @@ where
     B: Frame,
 {
     type Frame = B;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         self.source.next(sample_rate).map(&self.f)
     }
 }
@@ -442,7 +442,7 @@ where
     C: Frame,
 {
     type Frame = C;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         Some((self.f)(
             self.a.next(sample_rate)?,
             self.b.next(sample_rate)?,
@@ -463,7 +463,7 @@ where
     P: Automation,
 {
     type Frame = Stereo;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let pan = self.pan.next_value(sample_rate)?;
         let pan = (pan + 1.0) / 2.0;
         self.source.next(sample_rate).map(|frame| {
@@ -486,7 +486,7 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         self.source
             .next(sample_rate)
             .map(|frame| frame.map(|a| (a + 1.0) / 2.0))
@@ -500,7 +500,7 @@ pub struct Repeat<S, P> {
     count_left: Option<usize>,
     curr: Vec<S>,
     period: Option<P>,
-    time: f32,
+    time: f64,
     started: bool,
 }
 
@@ -528,7 +528,7 @@ where
     P: Automation,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let count_left = &mut self.count_left;
         let mut add_new = || match count_left {
             Some(count_left) => {
@@ -586,14 +586,14 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         self.source.lock().next(sample_rate)
     }
 }
 
 /// Used to coordinate the dropping of [`Source`]s
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Maintainer<R = f32> {
+pub struct Maintainer<R = f64> {
     arc: Arc<()>,
     release_dur: R,
 }
@@ -623,7 +623,7 @@ where
 
 /// An attack-decay-sustain evenlope
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AdsEnvelope<A = f32, D = f32, S = f32> {
+pub struct AdsEnvelope<A = f64, D = f64, S = f64> {
     /// The time after the sound starts before it is at its maximum volume
     pub attack: A,
     /// The time between the maximum amplitude and the sustain amplitude
@@ -634,9 +634,9 @@ pub struct AdsEnvelope<A = f32, D = f32, S = f32> {
 
 impl<A, D, S> Default for AdsEnvelope<A, D, S>
 where
-    A: From<f32>,
-    D: From<f32>,
-    S: From<f32>,
+    A: From<f64>,
+    D: From<f64>,
+    S: From<f64>,
 {
     fn default() -> Self {
         AdsEnvelope {
@@ -667,7 +667,7 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct Ads<Src, A, D, S> {
     source: Src,
-    time: f32,
+    time: f64,
     envelope: AdsEnvelope<A, D, S>,
 }
 
@@ -679,7 +679,7 @@ where
     S: Automation,
 {
     type Frame = Src::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let frame = self.source.next(sample_rate)?;
         let attack = self.envelope.attack.next_value(sample_rate)?;
         let decay = self.envelope.decay.next_value(sample_rate)?;
@@ -705,7 +705,7 @@ pub struct Maintained<S, R> {
     source: S,
     arc: Weak<()>,
     release_dur: R,
-    release_curr: f32,
+    release_curr: f64,
 }
 
 impl<S, R> Source for Maintained<S, R>
@@ -714,7 +714,7 @@ where
     R: Automation,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let release_dur = self.release_dur.next_value(sample_rate)?;
         if Weak::strong_count(&self.arc) == 0 {
             if self.release_curr < release_dur {
@@ -746,7 +746,7 @@ pub struct SourceInspector<F> {
 
 impl<S: Source> Source for InspectedSource<S> {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let frame = self.source.next(sample_rate);
         self.curr.set(frame.clone());
         frame
@@ -766,7 +766,7 @@ where
 /// Source returned from [`Source::buffer`]
 pub struct Buffered<S: Source> {
     inner: Arc<Mutex<BufferedInner<S>>>,
-    time: f32,
+    time: f64,
 }
 
 struct BufferedInner<S: Source> {
@@ -779,7 +779,7 @@ where
     S: Source,
 {
     type Frame = S::Frame;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let index = (self.time * sample_rate) as usize;
         let mut inner = self.inner.lock();
         while index >= inner.buffer.len() {
@@ -807,7 +807,7 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct Resample<S, F> {
     source: S,
-    time: f32,
+    time: f64,
     frame: Option<F>,
     pd: PhantomData<F>,
 }
@@ -838,7 +838,7 @@ where
                 if count < source_channels {
                     return None;
                 }
-                sample.set_channel(0, sum / count as f32);
+                sample.set_channel(0, sum / count as f64);
             }
             // For mono input and multi output, fill every output channel with the input one
             n if source_channels == 1 => {
@@ -871,7 +871,7 @@ where
     F: Frame,
 {
     type Frame = F;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let target_time = self.time + 1.0 / sample_rate;
         while self.time < target_time {
             self.frame = self.get_frame();
@@ -884,7 +884,7 @@ where
 /// Source returned from [`Source::unroll`]
 pub struct Unroll<S: Source> {
     source: S,
-    sample_rate: f32,
+    sample_rate: f64,
     curr: Option<S::Frame>,
     i: usize,
 }
@@ -893,7 +893,7 @@ impl<S> Iterator for Unroll<S>
 where
     S: Source,
 {
-    type Item = f32;
+    type Item = f64;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(curr) = &self.curr {
             if self.i < <S::Frame as Frame>::CHANNELS {
@@ -921,7 +921,7 @@ where
     fn channels(&self) -> usize {
         <S::Frame as Frame>::CHANNELS
     }
-    fn sample_rate(&self) -> f32 {
+    fn sample_rate(&self) -> f64 {
         self.sample_rate
     }
 }

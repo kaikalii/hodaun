@@ -19,9 +19,9 @@ over time or manually by some other code. The [`Automation`] trait is for any va
 as an automation parameter.
 
 The primary [`Automation`] implementors are:
-- [`f32`], `(`[`Letter`]`,`[`Octave`]`)`, and [`Pitch`] for constant values
+- [`f64`], `(`[`Letter`]`,`[`Octave`]`)`, and [`Pitch`] for constant values
 - [`Shared`]`<A: `[`Automation`]`>` for values that can be changed by other code
-- [`Source`]`<Frame = f32>` for values that change over time
+- [`Source`]`<Frame = f64>` for values that change over time
 
 ## Mixing
 
@@ -111,89 +111,89 @@ use parking_lot::Mutex;
 
 trait Amplitude: Clone + std::ops::AddAssign<Self> {
     const MIDPOINT: Self;
-    fn from_f32(f: f32) -> Self;
+    fn from_f64(f: f64) -> Self;
 }
 
 impl Amplitude for f32 {
     const MIDPOINT: Self = 0.0;
-    fn from_f32(f: f32) -> Self {
-        f
+    fn from_f64(f: f64) -> Self {
+        f as f32
     }
 }
 
 impl Amplitude for u16 {
     const MIDPOINT: Self = u16::MAX / 2;
-    fn from_f32(f: f32) -> Self {
-        const HALF_U16_MAX: f32 = u16::MAX as f32 * 0.5;
+    fn from_f64(f: f64) -> Self {
+        const HALF_U16_MAX: f64 = u16::MAX as f64 * 0.5;
         (f * HALF_U16_MAX + HALF_U16_MAX) as u16
     }
 }
 
 impl Amplitude for i16 {
     const MIDPOINT: Self = 0;
-    fn from_f32(f: f32) -> Self {
-        const I16_MAX: f32 = i16::MAX as f32;
+    fn from_f64(f: f64) -> Self {
+        const I16_MAX: f64 = i16::MAX as f64;
         (f * I16_MAX) as i16
     }
 }
 
 impl Amplitude for u8 {
     const MIDPOINT: Self = u8::MAX / 2;
-    fn from_f32(f: f32) -> Self {
-        const HALF_U8_MAX: f32 = u8::MAX as f32 * 0.5;
+    fn from_f64(f: f64) -> Self {
+        const HALF_U8_MAX: f64 = u8::MAX as f64 * 0.5;
         (f * HALF_U8_MAX + HALF_U8_MAX) as u8
     }
 }
 
 impl Amplitude for i8 {
     const MIDPOINT: Self = 0;
-    fn from_f32(f: f32) -> Self {
-        const I8_MAX: f32 = i8::MAX as f32;
+    fn from_f64(f: f64) -> Self {
+        const I8_MAX: f64 = i8::MAX as f64;
         (f * I8_MAX) as i8
     }
 }
 
 impl Amplitude for u32 {
     const MIDPOINT: Self = u32::MAX / 2;
-    fn from_f32(f: f32) -> Self {
-        const HALF_U32_MAX: f32 = u32::MAX as f32 * 0.5;
+    fn from_f64(f: f64) -> Self {
+        const HALF_U32_MAX: f64 = u32::MAX as f64 * 0.5;
         (f * HALF_U32_MAX + HALF_U32_MAX) as u32
     }
 }
 
 impl Amplitude for i32 {
     const MIDPOINT: Self = 0;
-    fn from_f32(f: f32) -> Self {
-        const I32_MAX: f32 = i32::MAX as f32;
+    fn from_f64(f: f64) -> Self {
+        const I32_MAX: f64 = i32::MAX as f64;
         (f * I32_MAX) as i32
     }
 }
 
 impl Amplitude for u64 {
     const MIDPOINT: Self = u64::MAX / 2;
-    fn from_f32(f: f32) -> Self {
-        const HALF_U64_MAX: f32 = u64::MAX as f32 * 0.5;
+    fn from_f64(f: f64) -> Self {
+        const HALF_U64_MAX: f64 = u64::MAX as f64 * 0.5;
         (f * HALF_U64_MAX + HALF_U64_MAX) as u64
     }
 }
 
 impl Amplitude for i64 {
     const MIDPOINT: Self = 0;
-    fn from_f32(f: f32) -> Self {
-        const I64_MAX: f32 = i64::MAX as f32;
+    fn from_f64(f: f64) -> Self {
+        const I64_MAX: f64 = i64::MAX as f64;
         (f * I64_MAX) as i64
     }
 }
 
 impl Amplitude for f64 {
     const MIDPOINT: Self = 0.0;
-    fn from_f32(f: f32) -> Self {
-        f as f64
+    fn from_f64(f: f64) -> Self {
+        f
     }
 }
 
 /// Linearly interpolate two numbers
-pub fn lerp(a: f32, b: f32, t: f32) -> f32 {
+pub fn lerp(a: f64, b: f64, t: f64) -> f64 {
     (1.0 - t) * a + t * b
 }
 
@@ -215,29 +215,36 @@ impl ToDuration for u64 {
     }
 }
 
-impl ToDuration for f32 {
+impl ToDuration for f64 {
     fn to_duration(self) -> Duration {
-        Duration::from_secs_f32(self)
+        Duration::from_secs_f64(self)
     }
 }
 
 /// Trait for automating source control value
 pub trait Automation {
     /// Get the next value
-    fn next_value(&mut self, sample_rate: f32) -> Option<f32>;
+    fn next_value(&mut self, sample_rate: f64) -> Option<f64>;
 }
 
 impl Automation for f32 {
     #[inline(always)]
-    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
+    fn next_value(&mut self, _sample_rate: f64) -> Option<f64> {
+        Some(*self as f64)
+    }
+}
+
+impl Automation for f64 {
+    #[inline(always)]
+    fn next_value(&mut self, _sample_rate: f64) -> Option<f64> {
         Some(*self)
     }
 }
 
 impl Automation for u64 {
     #[inline(always)]
-    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
-        Some(*self as f32)
+    fn next_value(&mut self, _sample_rate: f64) -> Option<f64> {
+        Some(*self as f64)
     }
 }
 
@@ -246,16 +253,16 @@ where
     A: Automation,
 {
     #[inline(always)]
-    fn next_value(&mut self, sample_rate: f32) -> Option<f32> {
+    fn next_value(&mut self, sample_rate: f64) -> Option<f64> {
         self.with(|auto| auto.next_value(sample_rate))
     }
 }
 
 impl<S> Automation for S
 where
-    S: Source<Frame = f32>,
+    S: Source<Frame = f64>,
 {
-    fn next_value(&mut self, sample_rate: f32) -> Option<f32> {
+    fn next_value(&mut self, sample_rate: f64) -> Option<f64> {
         Source::next(self, sample_rate)
     }
 }

@@ -21,7 +21,7 @@ pub fn default_input_device() -> Option<Device> {
 /// It can be turned into a source with [`UnrolledSource::resample`]
 pub struct InputDeviceSource {
     _stream: Stream,
-    recv: mpsc::Receiver<f32>,
+    recv: mpsc::Receiver<f64>,
     sample_rate: u32,
     channels: u16,
 }
@@ -29,7 +29,7 @@ pub struct InputDeviceSource {
 unsafe impl Send for InputDeviceSource {}
 
 impl Iterator for InputDeviceSource {
-    type Item = f32;
+    type Item = f64;
     fn next(&mut self) -> Option<Self::Item> {
         self.recv.recv().ok()
     }
@@ -39,8 +39,8 @@ impl UnrolledSource for InputDeviceSource {
     fn channels(&self) -> usize {
         self.channels as usize
     }
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate as f32
+    fn sample_rate(&self) -> f64 {
+        self.sample_rate as f64
     }
 }
 
@@ -79,16 +79,16 @@ impl InputDeviceSource {
             };
         }
         let stream = match sample_format {
-            SampleFormat::F32 => input_stream!(f32, |x| x),
-            SampleFormat::I16 => input_stream!(i16, |x| x as f32 / i16::MAX as f32),
-            SampleFormat::U16 => input_stream!(u16, |x| x as f32 - u16::MAX as f32 / 2.0),
-            SampleFormat::I8 => input_stream!(i8, |x| x as f32 / i8::MAX as f32),
-            SampleFormat::I32 => input_stream!(i32, |x| x as f32 / i32::MAX as f32),
-            SampleFormat::I64 => input_stream!(i64, |x| x as f32 / i64::MAX as f32),
-            SampleFormat::U8 => input_stream!(u8, |x| x as f32 - u8::MAX as f32 / 2.0),
-            SampleFormat::U32 => input_stream!(u32, |x| x as f32 - u32::MAX as f32 / 2.0),
-            SampleFormat::U64 => input_stream!(u64, |x| x as f32 - u64::MAX as f32 / 2.0),
-            SampleFormat::F64 => input_stream!(f64, |x| x as f32),
+            SampleFormat::F32 => input_stream!(f64, |x| x as f64),
+            SampleFormat::I16 => input_stream!(i16, |x| x as f64 / i16::MAX as f64),
+            SampleFormat::U16 => input_stream!(u16, |x| x as f64 - u16::MAX as f64 / 2.0),
+            SampleFormat::I8 => input_stream!(i8, |x| x as f64 / i8::MAX as f64),
+            SampleFormat::I32 => input_stream!(i32, |x| x as f64 / i32::MAX as f64),
+            SampleFormat::I64 => input_stream!(i64, |x| x as f64 / i64::MAX as f64),
+            SampleFormat::U8 => input_stream!(u8, |x| x as f64 - u8::MAX as f64 / 2.0),
+            SampleFormat::U32 => input_stream!(u32, |x| x as f64 - u32::MAX as f64 / 2.0),
+            SampleFormat::U64 => input_stream!(u64, |x| x as f64 - u64::MAX as f64 / 2.0),
+            SampleFormat::F64 => input_stream!(f64, |x| x),
             _ => return Err(BuildSystemAudioError::UnsupportedSampleFormat),
         }?;
 

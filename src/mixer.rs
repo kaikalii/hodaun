@@ -53,7 +53,7 @@ where
     F: Frame,
 {
     type Frame = F;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let mut sources = self.sources.lock();
         let mut frame = F::uniform(0.0);
         sources.retain_mut(|source| {

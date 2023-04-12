@@ -31,8 +31,8 @@ impl Letter {
         Pitch::new(self, octave)
     }
     /// Get the frequency of this letter in the given octave.
-    pub fn frequency(self, octave: Octave) -> f32 {
-        440.0 * 2f32.powf(((octave as f32 - 4.0) * 12.0 + (self as i8 as f32 - 9.0)) / 12.0)
+    pub fn frequency(self, octave: Octave) -> f64 {
+        440.0 * 2f64.powf(((octave as f64 - 4.0) * 12.0 + (self as i8 as f64 - 9.0)) / 12.0)
     }
     /// Get the number of half-steps above C0
     pub const fn half_steps(self, octave: Octave) -> i16 {
@@ -65,7 +65,7 @@ impl Pitch {
         Self { letter, octave }
     }
     /// Get the frequency of this pitch
-    pub fn frequency(&self) -> f32 {
+    pub fn frequency(&self) -> f64 {
         self.letter.frequency(self.octave)
     }
     /// Make a pitch from some snumber of half-steps above C0
@@ -95,13 +95,13 @@ impl Pitch {
 }
 
 impl Automation for Pitch {
-    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
+    fn next_value(&mut self, _sample_rate: f64) -> Option<f64> {
         Some(self.frequency())
     }
 }
 
 impl Automation for (Letter, Octave) {
-    fn next_value(&mut self, _sample_rate: f32) -> Option<f32> {
+    fn next_value(&mut self, _sample_rate: f64) -> Option<f64> {
         Some(self.0.frequency(self.1))
     }
 }
@@ -276,7 +276,7 @@ impl Mode {
         let base = base.into();
         let pitch = pitch.into();
         let steps =
-            ((pitch.to_half_steps() - base.to_half_steps()) as f32 / 12.0 * 7.0).round() as i16;
+            ((pitch.to_half_steps() - base.to_half_steps()) as f64 / 12.0 * 7.0).round() as i16;
         self.note(base, steps)
     }
 }

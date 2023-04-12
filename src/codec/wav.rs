@@ -34,11 +34,11 @@ impl<R> Iterator for WavSource<R>
 where
     R: Read,
 {
-    type Item = f32;
+    type Item = f64;
     fn next(&mut self) -> Option<Self::Item> {
         self.samples
             .next()
-            .map(|s| s.unwrap_or_else(|e| panic!("{}", e)))
+            .map(|s| s.unwrap_or_else(|e| panic!("{}", e)) as f64)
     }
 }
 
@@ -49,8 +49,8 @@ where
     fn channels(&self) -> usize {
         self.channels as usize
     }
-    fn sample_rate(&self) -> f32 {
-        self.sample_rate as f32
+    fn sample_rate(&self) -> f64 {
+        self.sample_rate as f64
     }
 }
 
@@ -67,9 +67,9 @@ where
         sample_format: SampleFormat::Float,
     };
     let mut writer = WavWriter::new(writer, spec)?;
-    while let Some(frame) = source.next(sample_rate as f32) {
+    while let Some(frame) = source.next(sample_rate as f64) {
         for i in 0..<S::Frame as Frame>::CHANNELS {
-            writer.write_sample(frame.get_channel(i))?;
+            writer.write_sample(frame.get_channel(i) as f32)?;
         }
     }
     Ok(())

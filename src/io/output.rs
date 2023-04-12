@@ -48,8 +48,8 @@ where
         DeviceIoBuilder::default_output().build_output()
     }
     /// Get the sample rate
-    pub fn sample_rate(&self) -> f32 {
-        self.sample_rate as f32
+    pub fn sample_rate(&self) -> f64 {
+        self.sample_rate as f64
     }
     pub(crate) fn from_builder(builder: DeviceIoBuilder) -> BuildSystemAudioResult<Self> {
         let device = if let Some(device) = builder.device {
@@ -127,7 +127,7 @@ where
     A: Amplitude,
 {
     let channels = config.channels as usize;
-    let sample_rate = config.sample_rate.0 as f32;
+    let sample_rate = config.sample_rate.0 as f64;
     let mut frame_buffer = vec![0.0; channels];
     let mut i = channels;
     move |buffer, _| {
@@ -141,7 +141,7 @@ where
                     break;
                 }
             }
-            *out_sample = A::from_f32(frame_buffer[i]);
+            *out_sample = A::from_f64(frame_buffer[i]);
             i += 1;
         }
     }

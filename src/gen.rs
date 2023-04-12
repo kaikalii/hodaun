@@ -1,7 +1,7 @@
 //! Wave generation
 
 use std::{
-    f32::consts::TAU,
+    f64::consts::TAU,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -13,19 +13,19 @@ use crate::{source::*, Automation, Mono};
 /// Defines a waveform
 pub trait Waveform {
     /// The perceptual loudness of this waveform compared to a sine wave
-    const LOUDNESS: f32;
+    const LOUDNESS: f64;
     /// Get the amplitude of a 1 Hz wave at the given time
     ///
     /// This should be in the range [-1.0, 1.0]
-    fn one_hz(&self, time: f32) -> f32;
+    fn one_hz(&self, time: f64) -> f64;
 }
 
 /// A [`Source`] implementation that outputs a simple wave
 #[derive(Debug, Clone, Copy)]
-pub struct Wave<W, F = f32> {
+pub struct Wave<W, F = f64> {
     waveform: W,
     freq: F,
-    time: f32,
+    time: f64,
 }
 
 impl<W, F> Wave<W, F> {
@@ -59,7 +59,7 @@ where
     F: Automation,
 {
     type Frame = Mono;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let res = 1.0 / W::LOUDNESS * self.waveform.one_hz(self.time);
         let freq = self.freq.next_value(sample_rate)?;
         self.time = (self.time + freq / sample_rate) % (freq * 10.0);
@@ -71,8 +71,8 @@ where
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Sine;
 impl Waveform for Sine {
-    const LOUDNESS: f32 = 1.0;
-    fn one_hz(&self, time: f32) -> f32 {
+    const LOUDNESS: f64 = 1.0;
+    fn one_hz(&self, time: f64) -> f64 {
         (time * TAU).sin()
     }
 }
@@ -81,8 +81,8 @@ impl Waveform for Sine {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Square;
 impl Waveform for Square {
-    const LOUDNESS: f32 = 3.0;
-    fn one_hz(&self, time: f32) -> f32 {
+    const LOUDNESS: f64 = 3.0;
+    fn one_hz(&self, time: f64) -> f64 {
         if (time * 2.0) as u64 % 2 == 0 {
             -1.0
         } else {
@@ -95,8 +95,8 @@ impl Waveform for Square {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Saw;
 impl Waveform for Saw {
-    const LOUDNESS: f32 = 3.0;
-    fn one_hz(&self, time: f32) -> f32 {
+    const LOUDNESS: f64 = 3.0;
+    fn one_hz(&self, time: f64) -> f64 {
         2.0 * (time - (time + 0.5).floor())
     }
 }
@@ -105,20 +105,20 @@ impl Waveform for Saw {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Triangle;
 impl Waveform for Triangle {
-    const LOUDNESS: f32 = 1.1;
-    fn one_hz(&self, time: f32) -> f32 {
+    const LOUDNESS: f64 = 1.1;
+    fn one_hz(&self, time: f64) -> f64 {
         2.0 * Saw.one_hz(time).abs() - 1.0
     }
 }
 
 /// A sine wave source
-pub type SineWave<F = f32> = Wave<Sine, F>;
+pub type SineWave<F = f64> = Wave<Sine, F>;
 /// A square wave source
-pub type SquareWave<F = f32> = Wave<Square, F>;
+pub type SquareWave<F = f64> = Wave<Square, F>;
 /// A saw wave source
-pub type SawWave<F = f32> = Wave<Saw, F>;
+pub type SawWave<F = f64> = Wave<Saw, F>;
 /// A triangle wave source
-pub type TriangleWave<F = f32> = Wave<Triangle, F>;
+pub type TriangleWave<F = f64> = Wave<Triangle, F>;
 
 /// Simple random noise source
 #[cfg(feature = "noise")]
@@ -151,8 +151,8 @@ impl Noise {
 #[cfg(feature = "noise")]
 impl Source for Noise {
     type Frame = Mono;
-    fn next(&mut self, _sample_rate: f32) -> Option<Self::Frame> {
-        Some(self.rng.gen_range(-1.0..=1.0) as f32)
+    fn next(&mut self, _sample_rate: f64) -> Option<Self::Frame> {
+        Some(self.rng.gen_range(-1.0..=1.0))
     }
 }
 
@@ -162,7 +162,7 @@ pub struct Lerp<A, B, D> {
     start: A,
     end: B,
     duration: D,
-    time: f32,
+    time: f64,
 }
 
 impl<A, B, D> Lerp<A, B, D> {
@@ -184,7 +184,7 @@ where
     D: Automation,
 {
     type Frame = Mono;
-    fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
+    fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let duration = self.duration.next_value(sample_rate)?;
         if self.time >= duration {
             return None;
