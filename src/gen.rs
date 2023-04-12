@@ -62,7 +62,7 @@ where
     fn next(&mut self, sample_rate: f32) -> Option<Self::Frame> {
         let res = 1.0 / W::LOUDNESS * self.waveform.one_hz(self.time);
         let freq = self.freq.next_value(sample_rate)?;
-        self.time += freq / sample_rate;
+        self.time = (self.time + freq / sample_rate) % (freq * 10.0);
         Some(res)
     }
 }
