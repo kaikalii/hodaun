@@ -79,7 +79,7 @@ impl InputDeviceSource {
             };
         }
         let stream = match sample_format {
-            SampleFormat::F32 => input_stream!(f64, |x| x as f64),
+            SampleFormat::F32 => input_stream!(f32, |x| x as f64),
             SampleFormat::I16 => input_stream!(i16, |x| x as f64 / i16::MAX as f64),
             SampleFormat::U16 => input_stream!(u16, |x| x as f64 - u16::MAX as f64 / 2.0),
             SampleFormat::I8 => input_stream!(i8, |x| x as f64 / i8::MAX as f64),
