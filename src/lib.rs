@@ -76,6 +76,15 @@ It also implements [`Automation`].
 It can be used to choose notes from a scale.
 
 Musical note functionality is only available when the `notes` feature is enabled.
+
+## A note on samples types
+
+While this library can handle audio input and output streams that work with various sample types,
+the library itself works with [`f64`] samples only, converting when necessary.
+
+There are two reasons for this:
+- Floating point is more natural to work with, as we often conceive of amplitude as a non-discrete value.
+- [`f64`] has higher precision than [`f32`], which is important for this library's audio synthesis algorithms.
 */
 
 #[cfg(any(feature = "wav", feature = "ogg"))]
