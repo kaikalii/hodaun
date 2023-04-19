@@ -8,7 +8,7 @@ use std::{
 #[cfg(feature = "rand")]
 use rand::prelude::*;
 
-use crate::{source::*, Automation, Mono};
+use crate::{lerp, source::*, Automation, Mono};
 
 /// Defines a waveform
 pub trait Waveform {
@@ -107,7 +107,7 @@ pub struct Triangle;
 impl Waveform for Triangle {
     const LOUDNESS: f64 = 1.1;
     fn one_hz(&self, time: f64) -> f64 {
-        2.0 * Saw.one_hz(time).abs() - 1.0
+        2f64.mul_add(Saw.one_hz(time).abs(), -1.0)
     }
 }
 
@@ -192,7 +192,7 @@ where
         let t = self.time / duration;
         let a = self.start.next_value(sample_rate)?;
         let b = self.end.next_value(sample_rate)?;
-        let res = a * (1.0 - t) + b * t;
+        let res = lerp(a, b, t);
         self.time += 1.0 / sample_rate;
         Some(res)
     }

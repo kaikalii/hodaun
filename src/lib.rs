@@ -167,7 +167,7 @@ impl Amplitude for u32 {
     const MIDPOINT: Self = u32::MAX / 2;
     fn from_f64(f: f64) -> Self {
         const HALF_U32_MAX: f64 = u32::MAX as f64 * 0.5;
-        (f * HALF_U32_MAX + HALF_U32_MAX) as u32
+        f.mul_add(HALF_U32_MAX, HALF_U32_MAX) as u32
     }
 }
 
@@ -183,7 +183,7 @@ impl Amplitude for u64 {
     const MIDPOINT: Self = u64::MAX / 2;
     fn from_f64(f: f64) -> Self {
         const HALF_U64_MAX: f64 = u64::MAX as f64 * 0.5;
-        (f * HALF_U64_MAX + HALF_U64_MAX) as u64
+        f.mul_add(HALF_U64_MAX, HALF_U64_MAX) as u64
     }
 }
 
@@ -204,7 +204,7 @@ impl Amplitude for f64 {
 
 /// Linearly interpolate two numbers
 pub fn lerp(a: f64, b: f64, t: f64) -> f64 {
-    (1.0 - t) * a + t * b
+    (b - a).mul_add(t, a)
 }
 
 /// A trait for converting to a [`Duration`]

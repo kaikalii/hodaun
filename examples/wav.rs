@@ -4,7 +4,7 @@ use hodaun::*;
 
 fn main() {
     // Write to a WAV file
-    let source = SineWave::new(261.63).amplify(0.5).take(2);
+    let source = SineWave::new(Letter::C.oct(4)).amplify(0.5).take(2);
     let file = File::create("example.wav").unwrap();
     wav::write_source(file, source, 44100).unwrap();
 
