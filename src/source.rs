@@ -34,7 +34,8 @@ pub trait UnrolledSource: Iterator<Item = f64> {
     {
         Resample {
             source: self,
-            time: 0.0,
+            input_time: 0.0,
+            output_time: 0.0,
             frame: None,
             pd: PhantomData,
         }
@@ -807,7 +808,8 @@ where
 #[derive(Debug, Clone, Copy)]
 pub struct Resample<S, F> {
     source: S,
-    time: f64,
+    input_time: f64,
+    output_time: f64,
     frame: Option<F>,
     pd: PhantomData<F>,
 }
@@ -872,10 +874,10 @@ where
 {
     type Frame = F;
     fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
-        let target_time = self.time + 1.0 / sample_rate;
-        while self.time < target_time {
+        self.output_time += 1.0 / sample_rate;
+        while self.input_time < self.output_time {
             self.frame = self.get_frame();
-            self.time += 1.0 / self.source.sample_rate();
+            self.input_time += 1.0 / self.source.sample_rate();
         }
         self.frame.clone()
     }
