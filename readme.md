@@ -2,6 +2,8 @@
 
 An audio IO and synthesis library for Rust.
 
+Built on top of [cpal](https://github.com/RustAudio/cpal).
+
 [Documentation](https://docs.rs/hodaun)
 
 ## Features
@@ -27,7 +29,7 @@ The main thing that makes Hodaun different from Rodio is that Hodaun's `Source`s
 In Rodio, `Source` processes one sample at a time, even if consecutive samples correspond to different channels of the same sample frame.
 This makes writing custom `Source`s that are channel-aware difficult.
 
-By contrast, Hodaun's `Source` trait groups samples in the same frame into a statically-sized array (or just a number for mono audio).
+By contrast, Hodaun's `Source` trait groups samples in the same frame into a statically-sized array (or just a number for mono audio) with a value for each channel.
 
 ### Sample rate
 

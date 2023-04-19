@@ -3,6 +3,7 @@ authors = ['Kai Schmidt <kaikaliischmidt@gmail.com>']
 categories = ['multimedia::audio']
 documentation = 'https://docs.rs/hodaun'
 edition = '2021'
+homepage = 'https://github.com/kaikalii/hodaun'
 keywords = ['audio', 'music', 'synthesizer', 'sound']
 license = 'MIT'
 name = 'hodaun'
