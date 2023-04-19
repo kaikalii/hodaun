@@ -25,17 +25,16 @@ pub trait Frame: Clone {
     fn get_channel(&self, index: usize) -> f64;
     /// Set the amplitude of a channel
     fn set_channel(&mut self, index: usize, amplitude: f64);
-    /// Apply a function to each channels
+    /// Apply a function to each channel
     fn map(self, f: impl Fn(f64) -> f64) -> Self;
     /// Combine two frames by applying a function
     fn merge(&mut self, other: Self, f: impl Fn(f64, f64) -> f64);
     /// Get the average amplitude
     fn avg(&self) -> f64 {
-        let channels = Self::CHANNELS;
         (0..Self::CHANNELS)
             .map(|i| self.get_channel(i))
             .sum::<f64>()
-            / channels as f64
+            / Self::CHANNELS as f64
     }
     /// Add two frames
     fn add(mut self, other: Self) -> Self {
@@ -49,7 +48,6 @@ pub trait Frame: Clone {
         match (Self::CHANNELS, slice.len()) {
             (1, _) => slice.fill(self.get_channel(0)),
             (_, 1) => slice[0] = self.avg(),
-            #[allow(clippy::needless_range_loop)]
             (a, b) => {
                 for i in 0..a.min(b) {
                     slice[i] = self.get_channel(i);

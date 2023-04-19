@@ -1,4 +1,5 @@
 #![warn(missing_docs)]
+#![allow(clippy::needless_range_loop)]
 
 /*!
 This crate provides interfaces for audio synthesis, mixing, input, and output.
@@ -77,7 +78,7 @@ It can be used to choose notes from a scale.
 
 Musical note functionality is only available when the `notes` feature is enabled.
 
-## A note on samples types
+## A note on sample types
 
 While this library can handle audio input and output streams that work with various sample types,
 the library itself works with [`f64`] samples only, converting when necessary.

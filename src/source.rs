@@ -14,7 +14,7 @@ use crate::{lerp, Automation, Frame, Shared, Stereo, ToDuration};
 /// This is usually only used for audio sources whose channel count
 /// is only known at runtime, like audio input.
 ///
-/// It can be converted to a [`Source`] by with [`UnrolledSource::resample`].
+/// It can be converted to a [`Source`] with [`UnrolledSource::resample`].
 pub trait UnrolledSource: Iterator<Item = f64> {
     /// Get the number of audio channels
     fn channels(&self) -> usize;
