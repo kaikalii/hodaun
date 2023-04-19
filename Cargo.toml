@@ -1,6 +1,7 @@
 [package]
 authors = ['Kai Schmidt <kaikaliischmidt@gmail.com>']
 categories = ['multimedia::audio']
+description = 'Audio IO and synthesis'
 documentation = 'https://docs.rs/hodaun'
 edition = '2021'
 homepage = 'https://github.com/kaikalii/hodaun'
