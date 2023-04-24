@@ -471,7 +471,7 @@ where
             let frame = frame.avg();
             let left = frame * (1.0 - pan);
             let right = frame * pan;
-            [left, right]
+            Stereo::new(left, right)
         })
     }
 }
