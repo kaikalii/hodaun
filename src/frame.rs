@@ -158,6 +158,12 @@ impl<T: Clone> Stereo<T> {
     }
 }
 
+impl<T: Clone> From<T> for Stereo<T> {
+    fn from(v: T) -> Self {
+        Self::both(v)
+    }
+}
+
 impl Stereo {
     /// `[0.0, 0.0]`
     pub const ZERO: Self = Self::new(0.0, 0.0);
@@ -165,6 +171,12 @@ impl Stereo {
     pub const LEFT: Self = Self::new(1.0, 0.0);
     /// `[0.0, 1.0]`
     pub const RIGHT: Self = Self::new(0.0, 1.0);
+    /// Create a new stereo frame with a panned value
+    pub fn pan(value: f64, pan: f64) -> Self {
+        let left = value * (1.0 - pan);
+        let right = value * pan;
+        Self::new(value * left, value * right)
+    }
     /// Get the average of the channels
     pub fn average(self) -> f64 {
         (self.left + self.right) / 2.0
