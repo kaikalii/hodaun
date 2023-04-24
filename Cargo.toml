@@ -9,7 +9,7 @@ keywords = ['audio', 'music', 'synthesizer', 'sound']
 license = 'MIT'
 name = 'hodaun'
 readme = 'readme.md'
-version = '0.2.2'
+version = '0.2.3'
 
 [dependencies]
 cpal.optional = true

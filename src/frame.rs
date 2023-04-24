@@ -175,7 +175,7 @@ impl Stereo {
     pub fn pan(value: f64, pan: f64) -> Self {
         let left = value * (-pan + 1.0).min(1.0);
         let right = value * (pan + 1.0).min(1.0);
-        Self::new(value * left, value * right)
+        Self::new(left, right)
     }
     /// Get the average of the channels
     pub fn average(self) -> f64 {
