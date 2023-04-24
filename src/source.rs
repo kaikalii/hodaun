@@ -467,12 +467,9 @@ where
     fn next(&mut self, sample_rate: f64) -> Option<Self::Frame> {
         let pan = self.pan.next_value(sample_rate)?;
         let pan = (pan + 1.0) / 2.0;
-        self.source.next(sample_rate).map(|frame| {
-            let frame = frame.avg();
-            let left = frame * (1.0 - pan);
-            let right = frame * pan;
-            Stereo::new(left, right)
-        })
+        self.source
+            .next(sample_rate)
+            .map(|frame| Stereo::pan(frame.avg(), pan))
     }
 }
 

@@ -173,8 +173,8 @@ impl Stereo {
     pub const RIGHT: Self = Self::new(0.0, 1.0);
     /// Create a new stereo frame with a panned value
     pub fn pan(value: f64, pan: f64) -> Self {
-        let left = value * (1.0 - pan);
-        let right = value * pan;
+        let left = value * (-pan + 1.0).min(1.0);
+        let right = value * (pan + 1.0).min(1.0);
         Self::new(value * left, value * right)
     }
     /// Get the average of the channels
