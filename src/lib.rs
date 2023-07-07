@@ -31,7 +31,8 @@ The primary [`Automation`] implementors are:
 ## Mixing
 
 [`Mixer`] is a [`Source`] that allows simple audio mixing.
-It implements [`Mix`], which allows adding sources to be mixed.
+
+Sources can be added to a [`Mixer`] with [`Mixer::add`].
 
 ## Synthesis
 

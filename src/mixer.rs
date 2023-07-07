@@ -4,33 +4,10 @@ use parking_lot::Mutex;
 
 use crate::{source::*, Frame};
 
-/// Trait for mixing [`Source`]s
-pub trait Mix {
-    /// The frame type
-    type Frame: Frame;
-    /// Add a source to the mixer to be played immediately
-    fn add<S>(&self, source: S)
-    where
-        S: Source<Frame = Self::Frame> + Send + 'static;
-}
-
 /// An [`Source`] that mixes multiple [`Source`]s together
 #[derive(Clone)]
 pub struct Mixer<F> {
     pub(crate) sources: Arc<Mutex<Vec<DynamicSource<F>>>>,
-}
-
-impl<F> Mix for Mixer<F>
-where
-    F: Frame,
-{
-    type Frame = F;
-    fn add<S>(&self, source: S)
-    where
-        S: Source<Frame = Self::Frame> + Send + 'static,
-    {
-        self.sources.lock().push(Box::new(source));
-    }
 }
 
 impl<F> Default for Mixer<F> {
@@ -45,6 +22,13 @@ impl<F> Mixer<F> {
     /// Create a new mixer
     pub fn new() -> Mixer<F> {
         Self::default()
+    }
+    /// Add a source to the mixer to be played immediately
+    pub fn add<S>(&self, source: S)
+    where
+        S: Source<Frame = F> + Send + 'static,
+    {
+        self.sources.lock().push(Box::new(source));
     }
 }
 

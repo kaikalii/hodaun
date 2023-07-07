@@ -9,7 +9,7 @@ use crate::{
 };
 
 use crate::{
-    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame, Mix, Source,
+    Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame, Source,
 };
 
 /// Get the default output device
@@ -24,19 +24,6 @@ pub struct OutputDeviceMixer<F> {
     mixer: Mixer<F>,
     stream: Stream,
     sample_rate: u32,
-}
-
-impl<F> Mix for OutputDeviceMixer<F>
-where
-    F: Frame + Send + 'static,
-{
-    type Frame = F;
-    fn add<S>(&self, source: S)
-    where
-        S: Source<Frame = F> + Send + 'static,
-    {
-        self.mixer.add(source);
-    }
 }
 
 impl<F> OutputDeviceMixer<F>
@@ -115,6 +102,17 @@ where
             thread::sleep(Duration::from_millis(1));
         }
         Ok(())
+    }
+    /// Add a source to the mixer to be played immediately
+    pub fn add<S>(&self, source: S)
+    where
+        S: Source<Frame = F> + Send + 'static,
+    {
+        self.mixer.add(source);
+    }
+    /// Get a reference to the mixer
+    pub fn mixer(&self) -> &Mixer<F> {
+        &self.mixer
     }
 }
 
