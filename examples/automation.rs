@@ -2,7 +2,7 @@ use hodaun::*;
 
 fn main() {
     // Initialize the output
-    let mut output = OutputDeviceMixer::<Mono>::with_default_device().unwrap();
+    let mut output = default_output().unwrap();
 
     // Build up a wubby wave
     let frequency_automation = Constant(Letter::G.frequency(1))
@@ -23,6 +23,6 @@ fn main() {
     let wub = base.low_pass(low_pass_automation);
     output.add(wub.take(16));
 
-    // Play
-    output.play_blocking().unwrap();
+    // Let it play
+    output.block();
 }

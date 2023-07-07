@@ -2,7 +2,7 @@ use hodaun::*;
 
 fn main() {
     // Initialize the output
-    let mut output = OutputDeviceMixer::<Stereo>::with_default_device().unwrap();
+    let mut output = default_output().unwrap();
 
     // Pan a sine wave back and forth at a frequency of 0.5 Hz
     output.add(
@@ -12,6 +12,6 @@ fn main() {
             .take(5),
     );
 
-    // Play
-    output.play_blocking().unwrap();
+    // Let it play
+    output.block();
 }

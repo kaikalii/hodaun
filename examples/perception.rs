@@ -2,7 +2,7 @@ use hodaun::*;
 
 fn main() {
     // Initialize the output
-    let mut output = OutputDeviceMixer::<Stereo>::with_default_device().unwrap();
+    let mut output = default_output().unwrap();
 
     // Play other waveforms alongside a sinewave to ensure they have the same perceptual loudness
     let sine = SineWave::new(261.63).take(6);
@@ -15,6 +15,6 @@ fn main() {
             .amplify(0.5),
     );
 
-    // Play
-    output.play_blocking().unwrap();
+    // Let it play
+    output.block();
 }

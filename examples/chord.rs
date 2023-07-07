@@ -2,7 +2,7 @@ use hodaun::*;
 
 fn main() {
     // Initialize the output and a chord mixer
-    let mut output = OutputDeviceMixer::<Mono>::with_default_device().unwrap();
+    let mut output = default_output().unwrap();
     let chord = Mixer::new();
 
     // Add notes to the chord
@@ -14,6 +14,6 @@ fn main() {
     // Add the chord to the output, only playing for 3 seconds
     output.add(chord.amplify(0.5).take(3));
 
-    // Play
-    output.play_blocking().unwrap();
+    // Let it play
+    output.block();
 }

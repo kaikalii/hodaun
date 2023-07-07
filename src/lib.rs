@@ -47,8 +47,7 @@ There are helpful type aliases for common waveforms such as [`SineWave`] and [`S
 ## Output
 
 [`OutputDeviceMixer`] is a [`Mix`] interface for an audio output device.
-An [`OutputDeviceMixer`] for the default output device can be created with
-[`OutputDeviceMixer::with_default_device`].
+An [`OutputDeviceMixer`] for the default output device can be created with [`default_output`].
 For more nuanced control, use [`DeviceIoBuilder::build_output`].
 
 Output functionality is only available when the `output` feature is enabled.
@@ -57,7 +56,7 @@ Output functionality is only available when the `output` feature is enabled.
 
 [`InputDeviceSource`] is a [`Source`] interface for an audio input device.
 An [`InputDeviceSource`] for the default input device can be created with
-[`InputDeviceSource::with_default_device`].
+[`default_input`].
 For more nuanced control, use [`DeviceIoBuilder::build_input`].
 
 Input functionality is only available when the `input` feature is enabled.

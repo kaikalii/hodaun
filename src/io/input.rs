@@ -9,6 +9,11 @@ use crate::{
     source::UnrolledSource, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder,
 };
 
+/// Create an audio input source using the default input device
+pub fn default_input() -> BuildSystemAudioResult<InputDeviceSource> {
+    DeviceIoBuilder::default_input().build_input()
+}
+
 /// Get the default input device
 pub fn default_input_device() -> Option<Device> {
     default_host().default_input_device()
@@ -16,7 +21,7 @@ pub fn default_input_device() -> Option<Device> {
 
 /// An [`UnrolledSource`] that receives audio samples from the system audio input
 ///
-/// It can be created with either [`InputDeviceSource::with_default_device`] or [`DeviceIoBuilder::build_input`]
+/// It can be created with either [`default_input`] or [`DeviceIoBuilder::build_input`]
 ///
 /// It can be turned into a source with [`UnrolledSource::resample`]
 pub struct InputDeviceSource {
@@ -45,10 +50,6 @@ impl UnrolledSource for InputDeviceSource {
 }
 
 impl InputDeviceSource {
-    /// Create a source using the default input device
-    pub fn with_default_device() -> BuildSystemAudioResult<Self> {
-        DeviceIoBuilder::default_input().build_input()
-    }
     pub(crate) fn from_builder(builder: DeviceIoBuilder) -> BuildSystemAudioResult<Self> {
         let device = if let Some(device) = builder.device {
             device

@@ -2,9 +2,9 @@ use hodaun::*;
 
 fn main() {
     // Initialize the output
-    let mut output = OutputDeviceMixer::<Mono>::with_default_device().unwrap();
+    let mut output = default_output().unwrap();
 
-    // Add a 2 square sine wave with a simple envelope
+    // Add a 2 square wave with a simple envelope
     output.add(
         SquareWave::new(220)
             .amplify(0.6)
@@ -13,6 +13,6 @@ fn main() {
             .repeat(4),
     );
 
-    // Play
-    output.play_blocking().unwrap();
+    // Let it play
+    output.block();
 }

@@ -1,10 +1,10 @@
 use hodaun::*;
 
 fn main() {
-    let input = InputDeviceSource::with_default_device().unwrap();
+    let input = default_input().unwrap();
     println!("{} input channel(s)", input.channels());
 
-    let mut output = OutputDeviceMixer::<Stereo>::with_default_device().unwrap();
+    let mut output = default_output::<Stereo>().unwrap();
 
     println!(
         "sample rates: {} -> {}",
@@ -14,5 +14,5 @@ fn main() {
 
     output.add(input.resample());
 
-    output.play_blocking().unwrap();
+    output.block();
 }

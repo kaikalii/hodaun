@@ -12,6 +12,13 @@ use crate::{
     Amplitude, BuildSystemAudioError, BuildSystemAudioResult, DeviceIoBuilder, Frame, Source,
 };
 
+/// Create an audio output mixer using the default output device and start it playing immediately
+///
+/// To pick the audio device or stream configuration, use a [`DeviceIoBuilder`].
+pub fn default_output<F: Frame>() -> BuildSystemAudioResult<OutputDeviceMixer<F>> {
+    DeviceIoBuilder::default_output().build_output()
+}
+
 /// Get the default output device
 pub fn default_output_device() -> Option<Device> {
     default_host().default_output_device()
@@ -19,24 +26,42 @@ pub fn default_output_device() -> Option<Device> {
 
 /// Mixes audio sources and outputs them to a device
 ///
-/// It can be created with either [`OutputDeviceMixer::with_default_device`] or [`DeviceIoBuilder::build_output`]
+/// It can be created with either [`default_output`] or [`DeviceIoBuilder::build_output`]
 pub struct OutputDeviceMixer<F> {
     mixer: Mixer<F>,
-    stream: Stream,
+    _stream: Stream,
     sample_rate: u32,
 }
 
 impl<F> OutputDeviceMixer<F>
 where
-    F: Frame + Send + 'static,
+    F: Frame,
 {
-    /// Create a mixer using the default output device
-    pub fn with_default_device() -> BuildSystemAudioResult<Self> {
-        DeviceIoBuilder::default_output().build_output()
-    }
     /// Get the sample rate
     pub fn sample_rate(&self) -> f64 {
         self.sample_rate as f64
+    }
+    /// Block the thread until all sources have finished
+    pub fn block(&mut self) {
+        while self
+            .mixer
+            .sources
+            .try_lock()
+            .map_or(true, |sources| !sources.is_empty())
+        {
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
+    /// Add a source to the mixer to be played immediately
+    pub fn add<S>(&self, source: S)
+    where
+        S: Source<Frame = F> + Send + 'static,
+    {
+        self.mixer.add(source);
+    }
+    /// Get a reference to the mixer
+    pub fn mixer(&self) -> &Mixer<F> {
+        &self.mixer
     }
     pub(crate) fn from_builder(builder: DeviceIoBuilder) -> BuildSystemAudioResult<Self> {
         let device = if let Some(device) = builder.device {
@@ -78,53 +103,14 @@ where
             _ => return Err(BuildSystemAudioError::UnsupportedSampleFormat),
         }
         .unwrap();
+
+        stream.play()?;
+
         Ok(OutputDeviceMixer {
             mixer,
-            stream,
+            _stream: stream,
             sample_rate: config.sample_rate.0,
         })
-    }
-    /// Start the mixer playing without blocking the thread
-    ///
-    /// Playback will stop if the mixer is dropped
-    pub fn play(&mut self) -> Result<(), PlayStreamError> {
-        self.stream.play()
-    }
-    /// Play the mixer, blocking the thread until all sources have finished
-    pub fn play_blocking(&mut self) -> Result<(), PlayStreamError> {
-        self.play()?;
-        while self
-            .mixer
-            .sources
-            .try_lock()
-            .map_or(true, |sources| !sources.is_empty())
-        {
-            thread::sleep(Duration::from_millis(1));
-        }
-        Ok(())
-    }
-    /// Method-chaining version of [`OutputDeviceMixer::play`]
-    ///
-    /// # Example
-    /// ```
-    /// use hodaun::*;
-    ///
-    /// let output = OutputDeviceMixer::<Mono>::with_default_device().unwrap().playing().unwrap();
-    /// ```
-    pub fn playing(mut self) -> Result<Self, PlayStreamError> {
-        self.play()?;
-        Ok(self)
-    }
-    /// Add a source to the mixer to be played immediately
-    pub fn add<S>(&self, source: S)
-    where
-        S: Source<Frame = F> + Send + 'static,
-    {
-        self.mixer.add(source);
-    }
-    /// Get a reference to the mixer
-    pub fn mixer(&self) -> &Mixer<F> {
-        &self.mixer
     }
 }
 

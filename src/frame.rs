@@ -14,7 +14,7 @@ pub fn stereo(frame: Mono) -> Stereo {
 }
 
 /// A single multi-channel frame in an audio source
-pub trait Frame: Clone {
+pub trait Frame: Clone + Send + 'static {
     /// The number of audio channels
     const CHANNELS: usize;
     /// Create a frame with a uniform amplitude across all channels

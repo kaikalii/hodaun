@@ -95,7 +95,7 @@ impl DeviceIoBuilder {
     #[cfg(feature = "output")]
     pub fn build_output<F>(self) -> BuildSystemAudioResult<OutputDeviceMixer<F>>
     where
-        F: Frame + Send + 'static,
+        F: Frame,
     {
         OutputDeviceMixer::from_builder(self)
     }
