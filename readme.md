@@ -1,3 +1,7 @@
+[<img alt="github" src="https://img.shields.io/badge/GitHub-kaikalii%2Fhodaun-8da0cb?logo=github">](https://github.com/kaikalii/hodaun)
+[<img alt="crates.io" src="https://img.shields.io/badge/crates.io-hodaun-orange?logo=rust">](https://crates.io/crates/hodaun)
+[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-hodaun-blue?logo=docs.rs">](https://docs.rs/hodaun)
+
 # Hodaun
 
 An audio IO and synthesis library for Rust.
