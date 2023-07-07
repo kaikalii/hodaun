@@ -103,6 +103,18 @@ where
         }
         Ok(())
     }
+    /// Method-chaining version of [`OutputDeviceMixer::play`]
+    ///
+    /// # Example
+    /// ```
+    /// use hodaun::*;
+    ///
+    /// let output = OutputDeviceMixer::<Mono>::with_default_device().unwrap().playing().unwrap();
+    /// ```
+    pub fn playing(mut self) -> Result<Self, PlayStreamError> {
+        self.play()?;
+        Ok(self)
+    }
     /// Add a source to the mixer to be played immediately
     pub fn add<S>(&self, source: S)
     where
