@@ -14,6 +14,13 @@ pub fn default_input() -> BuildSystemAudioResult<InputDeviceSource> {
     DeviceIoBuilder::default_input().build_input()
 }
 
+/// Create an audio input source using the default output device
+///
+/// This is useful for recording desktop audio output.
+pub fn default_output_as_input() -> BuildSystemAudioResult<InputDeviceSource> {
+    DeviceIoBuilder::default_output().build_input()
+}
+
 /// Get the default input device
 pub fn default_input_device() -> Option<Device> {
     default_host().default_input_device()
