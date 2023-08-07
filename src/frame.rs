@@ -80,6 +80,31 @@ impl Frame for f64 {
     }
 }
 
+impl Frame for f32 {
+    const CHANNELS: usize = 1;
+    fn uniform(amplitude: f64) -> Self {
+        amplitude as f32
+    }
+    fn get_channel(&self, _index: usize) -> f64 {
+        *self as f64
+    }
+    fn set_channel(&mut self, _index: usize, amplitude: f64) {
+        *self = amplitude as f32;
+    }
+    fn map(self, f: impl Fn(f64) -> f64) -> Self {
+        f(self as f64) as f32
+    }
+    fn merge(&mut self, other: Self, f: impl Fn(f64, f64) -> f64) {
+        *self = f(*self as f64, other as f64) as f32;
+    }
+    fn avg(&self) -> f64 {
+        *self as f64
+    }
+    fn add(self, other: Self) -> Self {
+        self + other
+    }
+}
+
 impl<const N: usize> Frame for [f64; N]
 where
     Self: Default,
@@ -100,6 +125,30 @@ where
     fn merge(&mut self, other: Self, f: impl Fn(f64, f64) -> f64) {
         for (a, b) in self.iter_mut().zip(other) {
             *a = f(*a, b);
+        }
+    }
+}
+
+impl<const N: usize> Frame for [f32; N]
+where
+    Self: Default,
+{
+    const CHANNELS: usize = N;
+    fn uniform(amplitude: f64) -> Self {
+        [amplitude as f32; N]
+    }
+    fn get_channel(&self, index: usize) -> f64 {
+        self[index] as f64
+    }
+    fn set_channel(&mut self, index: usize, amplitude: f64) {
+        self[index] = amplitude as f32;
+    }
+    fn map(self, f: impl Fn(f64) -> f64) -> Self {
+        self.map(|v| f(v as f64) as f32)
+    }
+    fn merge(&mut self, other: Self, f: impl Fn(f64, f64) -> f64) {
+        for (a, b) in self.iter_mut().zip(other) {
+            *a = f(*a as f64, b as f64) as f32;
         }
     }
 }
@@ -252,5 +301,24 @@ impl Frame for Stereo {
     }
     fn merge(&mut self, other: Self, f: impl Fn(f64, f64) -> f64) {
         *self = self.with(other, f);
+    }
+}
+
+impl Frame for Stereo<f32> {
+    const CHANNELS: usize = 2;
+    fn uniform(amplitude: f64) -> Self {
+        Self::both(amplitude as f32)
+    }
+    fn get_channel(&self, index: usize) -> f64 {
+        unsafe { transmute::<&Self, &[f32; 2]>(self)[index] as f64 }
+    }
+    fn set_channel(&mut self, index: usize, amplitude: f64) {
+        unsafe { transmute::<&mut Self, &mut [f32; 2]>(self)[index] = amplitude as f32 }
+    }
+    fn map(self, f: impl Fn(f64) -> f64) -> Self {
+        Self::map(self, |v| f(v as f64) as f32)
+    }
+    fn merge(&mut self, other: Self, f: impl Fn(f64, f64) -> f64) {
+        *self = self.with(other, |a, b| f(a as f64, b as f64) as f32);
     }
 }
