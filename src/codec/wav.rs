@@ -12,7 +12,13 @@ pub use hound::Error as WaveError;
 pub struct WavSource<R> {
     sample_rate: u32,
     channels: u16,
-    samples: WavIntoSamples<R, f32>,
+    samples: GenericWaveSamples<R>,
+}
+
+enum GenericWaveSamples<R> {
+    I16(WavIntoSamples<R, i16>),
+    I32(WavIntoSamples<R, i32>),
+    F32(WavIntoSamples<R, f32>),
 }
 
 impl<R> WavSource<R>
@@ -25,7 +31,14 @@ where
         Ok(Self {
             sample_rate: reader.spec().sample_rate,
             channels: reader.spec().channels,
-            samples: reader.into_samples(),
+            samples: match reader.spec().sample_format {
+                SampleFormat::Int => match reader.spec().bits_per_sample {
+                    16 => GenericWaveSamples::I16(reader.into_samples::<i16>()),
+                    32 => GenericWaveSamples::I32(reader.into_samples::<i32>()),
+                    _ => return Err(WaveError::Unsupported),
+                },
+                SampleFormat::Float => GenericWaveSamples::F32(reader.into_samples::<f32>()),
+            },
         })
     }
 }
@@ -36,9 +49,17 @@ where
 {
     type Item = f64;
     fn next(&mut self) -> Option<Self::Item> {
-        self.samples
-            .next()
-            .map(|s| s.unwrap_or_else(|e| panic!("{}", e)) as f64)
+        Some(match &mut self.samples {
+            GenericWaveSamples::I16(samples) => {
+                samples.next()?.unwrap_or_else(|e| panic!("{e}")) as f64 / i16::MAX as f64
+            }
+            GenericWaveSamples::I32(samples) => {
+                samples.next()?.unwrap_or_else(|e| panic!("{e}")) as f64 / i32::MAX as f64
+            }
+            GenericWaveSamples::F32(samples) => {
+                samples.next()?.unwrap_or_else(|e| panic!("{e}")) as f64
+            }
+        })
     }
 }
 
