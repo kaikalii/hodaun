@@ -111,7 +111,7 @@ pub use io::*;
 #[cfg(feature = "notes")]
 pub use note::*;
 #[doc(inline)]
-pub use source::{AdsEnvelope, Constant, Maintainer, Source, UnrolledSource};
+pub use source::{AdsEnvelope, Buffered, Constant, Maintainer, Source, UnrolledSource};
 use std::{
     cmp::Ordering,
     fmt,

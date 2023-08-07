@@ -270,6 +270,17 @@ pub trait Source {
     }
 }
 
+/// A source that produces no samples
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Empty<F>(PhantomData<F>);
+
+impl<F: Frame> Source for Empty<F> {
+    type Frame = F;
+    fn next(&mut self, _sample_rate: f64) -> Option<Self::Frame> {
+        None
+    }
+}
+
 pub(crate) type DynamicSource<F> = Box<dyn Source<Frame = F> + Send + 'static>;
 
 /// A source that returns a constant value
@@ -764,6 +775,18 @@ where
 pub struct Buffered<S: Source> {
     inner: Arc<Mutex<BufferedInner<S>>>,
     time: f64,
+}
+
+impl<F: Frame> From<Vec<F>> for Buffered<Empty<F>> {
+    fn from(buffer: Vec<F>) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(BufferedInner {
+                source: Empty(PhantomData),
+                buffer,
+            })),
+            time: 0.0,
+        }
+    }
 }
 
 struct BufferedInner<S: Source> {
