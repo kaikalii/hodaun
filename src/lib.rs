@@ -98,8 +98,8 @@ mod frame;
 pub mod gen;
 #[cfg(any(feature = "input", feature = "output"))]
 mod io;
-#[cfg(feature = "notes")]
 mod mixer;
+#[cfg(feature = "notes")]
 mod note;
 pub mod source;
 

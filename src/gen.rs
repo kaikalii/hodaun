@@ -1,9 +1,6 @@
 //! Wave generation
 
-use std::{
-    f64::consts::TAU,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::f64::consts::TAU;
 
 #[cfg(feature = "rand")]
 use rand::prelude::*;
@@ -127,6 +124,7 @@ pub struct Noise {
     rng: SmallRng,
 }
 
+#[cfg(feature = "noise")]
 impl Default for Noise {
     fn default() -> Self {
         Self::new()
@@ -139,8 +137,8 @@ impl Noise {
     pub fn new() -> Self {
         Noise {
             rng: SmallRng::seed_from_u64(
-                SystemTime::now()
-                    .duration_since(UNIX_EPOCH)
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_nanos() as u64,
             ),
